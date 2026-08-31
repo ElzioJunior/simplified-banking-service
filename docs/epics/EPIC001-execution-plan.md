@@ -116,9 +116,12 @@ finalization.
 ## Checkpoint
 
 - Status: in progress
-- Completed slices: 1–2
+- Completed slices: 1–3
 - Validation evidence:
   - `./mvnw -B -ntp clean test` — 13 core unit scenarios passed at slice 1
   - `./mvnw -B -ntp clean verify` — 17 unit and 7 isolated functional
     scenarios passed with the 90% eligible-code coverage gate at slice 2
-- Next action: implement the mock-free HTTP/PostgreSQL integrated scenarios
+  - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 17 unit,
+    7 isolated functional, and 11 integrated scenarios passed; the integrated
+    total comprises 5 account HTTP/PostgreSQL and 6 migration scenarios
+- Next action: run final quality gates, review, and documentation synchronization

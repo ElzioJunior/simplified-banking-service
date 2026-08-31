@@ -7,7 +7,7 @@ This is the single execution report for all epic execution plans.
 | Epic | Execution plan | Status | Latest checkpoint |
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
-| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | In progress | HTTP contract and isolated tests completed |
+| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | In progress | Real HTTP/PostgreSQL suite passed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Backlog | Workflow 01 not started |
 
 ## Completed foundation work
@@ -112,6 +112,11 @@ consequential Workflow 05 authorization gate applies.
 At the latest checkpoint, the persistence/use-case slice and HTTP/security
 slice are complete. `./mvnw -B -ntp clean verify` passed 17 unit tests and 7
 isolated MVC scenarios, including the 90% eligible-code line-coverage gate.
+The opt-in integrated lifecycle also passed 5 account-creation scenarios and
+the existing 6 migration scenarios against disposable PostgreSQL 17.6
+containers. During integrated verification, timestamp values were aligned to
+PostgreSQL microsecond precision and servlet security configuration was scoped
+away from non-web application contexts.
 
 ## Source control
 

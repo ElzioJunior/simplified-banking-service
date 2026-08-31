@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +46,8 @@ public class CreateAccountService {
 
         String name = validateName(command.name());
         BigDecimal balance = normalizeBalance(command.initialBalance());
-        OffsetDateTime createdAt = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
+        OffsetDateTime createdAt = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+                .truncatedTo(ChronoUnit.MICROS);
 
         Account savedAccount = accountRepository.save(new Account(name, balance, createdAt));
         return new CreatedAccount(

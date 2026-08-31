@@ -31,7 +31,9 @@ import com.elziojunior.simplifiedbankingservice.account.repository.AccountReposi
 @ExtendWith(MockitoExtension.class)
 class CreateAccountServiceTest {
 
-    private static final Instant CREATION_INSTANT = Instant.parse("2026-08-31T14:00:00Z");
+    private static final Instant CREATION_INSTANT = Instant.parse("2026-08-31T14:00:00.123456789Z");
+    private static final OffsetDateTime PERSISTED_CREATION_TIME =
+            OffsetDateTime.parse("2026-08-31T14:00:00.123456Z");
 
     @Mock
     private AccountRepository accountRepository;
@@ -59,12 +61,12 @@ class CreateAccountServiceTest {
         assertThat(submittedAccount.getName()).isEqualTo("John Doe");
         assertThat(submittedAccount.getBalance()).isEqualByComparingTo("123.45");
         assertThat(submittedAccount.getBalance().scale()).isEqualTo(2);
-        assertThat(submittedAccount.getCreatedAt()).isEqualTo("2026-08-31T14:00:00Z");
+        assertThat(submittedAccount.getCreatedAt()).isEqualTo(PERSISTED_CREATION_TIME);
 
         assertThat(result.id()).isEqualTo(42L);
         assertThat(result.name()).isEqualTo("John Doe");
         assertThat(result.balance()).isEqualByComparingTo("123.45");
-        assertThat(result.createdAt()).isEqualTo("2026-08-31T14:00:00Z");
+        assertThat(result.createdAt()).isEqualTo(PERSISTED_CREATION_TIME);
     }
 
     /** Proves that a zero opening balance remains a valid scale-two monetary value. */
@@ -176,7 +178,7 @@ class CreateAccountServiceTest {
         when(persistedAccount.getId()).thenReturn(id);
         when(persistedAccount.getName()).thenReturn(name);
         when(persistedAccount.getBalance()).thenReturn(balance);
-        when(persistedAccount.getCreatedAt()).thenReturn(OffsetDateTime.ofInstant(CREATION_INSTANT, ZoneOffset.UTC));
+        when(persistedAccount.getCreatedAt()).thenReturn(PERSISTED_CREATION_TIME);
         when(accountRepository.save(any(Account.class))).thenReturn(persistedAccount);
     }
 }

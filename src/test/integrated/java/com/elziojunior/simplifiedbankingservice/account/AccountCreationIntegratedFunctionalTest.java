@@ -1,0 +1,149 @@
+package com.elziojunior.simplifiedbankingservice.account;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Map;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+import com.elziojunior.simplifiedbankingservice.account.api.AccountResponse;
+import com.elziojunior.simplifiedbankingservice.account.api.CreateAccountRequest;
+
+@Testcontainers
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AccountCreationIntegratedFunctionalTest {
+
+    @Container
+    @ServiceConnection
+    private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>("postgres:17.6-alpine");
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /** Clears owned rows and identities so every HTTP/database scenario is independent. */
+    @BeforeEach
+    void resetSchemaData() {
+        jdbcTemplate.execute("TRUNCATE TABLE movements, accounts RESTART IDENTITY");
+    }
+
+    /** Proves unauthenticated HTTP creation persists the complete approved account shape. */
+    @Test
+    void shouldCreateAndPersistAnAccountThroughThePublicApi() {
+        ResponseEntity<AccountResponse> response = create("Ada Lovelace", "100.00");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        AccountResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.id()).isEqualTo(1L);
+        assertThat(body.name()).isEqualTo("Ada Lovelace");
+        assertThat(body.balance()).isEqualByComparingTo("100.00");
+        assertThat(body.createdAt().getOffset()).isEqualTo(ZoneOffset.UTC);
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap(
+                "SELECT id, name, balance, created_at FROM accounts WHERE id = ?",
+                body.id());
+        assertThat(stored.get("name")).isEqualTo("Ada Lovelace");
+        assertThat((BigDecimal) stored.get("balance")).isEqualByComparingTo("100.00");
+        assertThat(((Timestamp) stored.get("created_at")).toInstant()).isEqualTo(body.createdAt().toInstant());
+    }
+
+    /** Proves zero balances are accepted and independent requests receive unique identities. */
+    @Test
+    void shouldCreateZeroBalanceAccountsWithUniqueIdentifiers() {
+        AccountResponse first = create("First", "0").getBody();
+        AccountResponse second = create("Second", "0.00").getBody();
+
+        assertThat(first).isNotNull();
+        assertThat(second).isNotNull();
+        assertThat(first.id()).isNotEqualTo(second.id());
+        assertThat(first.balance()).isEqualByComparingTo("0.00");
+        assertThat(second.balance()).isEqualByComparingTo("0.00");
+        assertThat(accountCount()).isEqualTo(2);
+    }
+
+    /** Proves HALF_EVEN normalization survives the HTTP, JPA, and PostgreSQL round trip. */
+    @Test
+    void shouldRoundMonetaryValuesHalfEvenAndPersistUtcInstants() {
+        AccountResponse lowerTie = create("Lower tie", "1.225").getBody();
+        AccountResponse upperTie = create("Upper tie", "1.235").getBody();
+
+        assertThat(lowerTie).isNotNull();
+        assertThat(upperTie).isNotNull();
+        assertThat(lowerTie.balance()).isEqualByComparingTo("1.22");
+        assertThat(upperTie.balance()).isEqualByComparingTo("1.24");
+        assertThat(lowerTie.createdAt().getOffset()).isEqualTo(ZoneOffset.UTC);
+        assertThat(upperTie.createdAt().getOffset()).isEqualTo(ZoneOffset.UTC);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT balance FROM accounts WHERE id = ?", BigDecimal.class, lowerTie.id()))
+                .isEqualByComparingTo("1.22");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT balance FROM accounts WHERE id = ?", BigDecimal.class, upperTie.id()))
+                .isEqualByComparingTo("1.24");
+    }
+
+    /** Proves every invalid request is atomic and returns safe Problem Details. */
+    @Test
+    void shouldRejectInvalidRequestsWithoutPersistingAccounts() {
+        assertBadRequest(new CreateAccountRequest("   ", BigDecimal.ZERO));
+        assertBadRequest(new CreateAccountRequest("Negative sub-cent", new BigDecimal("-0.001")));
+        assertBadRequest(new CreateAccountRequest(
+                "Overflow after rounding", new BigDecimal("99999999999999999.995")));
+
+        assertThat(accountCount()).isZero();
+    }
+
+    /** Proves unsupported account operations stay absent and operational routes stay protected. */
+    @Test
+    void shouldPreserveApiAndOperationalSecurityBoundaries() {
+        assertThat(restTemplate.getForEntity("/api/v1/accounts/1", String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(restTemplate.exchange(
+                "/api/v1/accounts/1", HttpMethod.DELETE, HttpEntity.EMPTY, String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(restTemplate.getForEntity("/actuator/health", String.class).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    private ResponseEntity<AccountResponse> create(String name, String balance) {
+        return restTemplate.postForEntity(
+                "/api/v1/accounts",
+                new CreateAccountRequest(name, new BigDecimal(balance)),
+                AccountResponse.class);
+    }
+
+    private void assertBadRequest(CreateAccountRequest request) {
+        ResponseEntity<ErrorResponse> response = restTemplate.postForEntity(
+                "/api/v1/accounts", request, ErrorResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo(
+                new ErrorResponse(400, "Invalid account creation request"));
+    }
+
+    private int accountCount() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM accounts", Integer.class);
+    }
+
+    private record ErrorResponse(int status, String title) {
+    }
+}
