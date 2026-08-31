@@ -8,7 +8,7 @@ This is the single execution report for all epic execution plans.
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
-| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Backlog | Workflow 01 not started |
+| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | In progress | Flyway V2 and 7 real schema tests completed |
 
 ## Completed foundation work
 
@@ -139,17 +139,78 @@ is configured, so none is claimed.
 - Final review fixes and documentation are recorded by the subsequent
   finalization commit in branch history.
 
+## Active plan: EPIC002
+
+### Planned scope
+
+Deliver only server-issued 10-minute transfer tokens, atomic
+account-to-account transfers through `POST /api/v1/transfers`, exactly two
+correlated movements, and one durable asynchronous notification intent for the
+source account holder. Movement-query APIs, notification delivery channels,
+authentication, overdrafts, fees, scheduled transfers, and a separate Transfer
+entity remain excluded.
+
+### Delivery order
+
+1. Add Flyway V2 token/outbox storage and verify real PostgreSQL constraints.
+2. Add persistence mappings, repositories, deterministic pessimistic locking,
+   and configurable bounded lock waiting.
+3. Implement and expose token issuance.
+4. Implement the single-transaction idempotent transfer use case.
+5. Expose the versioned transfer API and safe RFC 9457 failures.
+6. Publish durable notification intents to RabbitMQ after commit with confirms
+   and retry of pending outbox records.
+7. Prove rollback, recovery, idempotency, and concurrency through real
+   HTTP/PostgreSQL/RabbitMQ Testcontainers.
+8. Prepare Gatling load simulations, then complete quality gates, review, and
+   documentation.
+
+### Decisions and risks
+
+ADR-0026 fixes the token endpoint and `Idempotency-Key` contract. ADR-0024 and
+ADR-0025 require ascending-ID pessimistic locks within one `READ_COMMITTED`
+transaction. ADR-0029 bounds lock waiting, prohibits automatic whole-transfer
+retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0028 uses a
+transactional outbox so RabbitMQ availability cannot determine the financial
+commit. RabbitMQ publication is at least once, so stable event identity is
+mandatory for downstream deduplication. Hot accounts intentionally serialize;
+distributed accounts should retain independent throughput. The API remains
+temporarily unauthenticated under ADR-0027 and is unsuitable for untrusted
+network exposure. ADR-0008 supplies bounded Micrometer outcome, latency,
+database-error, timeout, and contention metrics without financial identifiers
+as metric labels; logs correlate successful operations by operation ID without
+including tokens, payloads, balances, or customer data.
+
+### Validation and authorization boundaries
+
+Default `test` and `verify` remain infrastructure-independent and enforce the
+90% eligible-code coverage gate. The opt-in integrated profile uses disposable
+PostgreSQL 17.6 and RabbitMQ 4.1.4 containers to verify real migrations,
+transactions, broker recovery, concurrent overspend prevention, cross-transfer
+lock order, 100-transfer exhaustion, and money conservation without mocks.
+Those resources are local and disposable, so they do not require a
+consequential-boundary pause.
+
+Gatling targets a separately running dedicated environment and can create
+sustained load. Workflow 05 must stop immediately before its first run and ask
+for authorization naming the base URL, environment, concurrency, duration, and
+cleanup. No lint, static-analysis, dependency/security scanner, or standalone
+schema-quality tool is configured.
+
 ## Source control
 
 EPIC001 was delivered in coherent non-destructive commits on `feature/ep001`.
-Force-push, history rewriting, pull requests, deployments, and releases remain
-excluded because none was requested. Unrelated worktree changes for the Agent
-Skills/workflows migration and other epic filename normalization were preserved
-outside EPIC001 commits.
+If EPIC002 development is authorized, coherent non-destructive commits and
+pushes on `feature/ep002` are included through review and finalization. Existing
+unrelated `.gitkeep` deletions remain outside EPIC002 commits. Force-push,
+history rewriting, pull requests, merges, deployments, releases, and Gatling
+execution remain excluded unless their respective authorization is explicit.
 
-## Authorization request
+## Authorization
 
 Development authorization was granted on 2026-08-31. It covers the planned
-implementation, validation, review fixes, local disposable integrated suite,
-final documentation, and normal non-destructive commits and pushes. No
-consequential external-boundary authorization gate applies to EPIC001.
+implementation, local quality and disposable integrated tests, review/fix
+loops, documentation, and normal non-destructive commits and pushes. Flyway V2
+and its 7 PostgreSQL 17.6 schema scenarios are complete. The authorization does
+not cover the Gatling run: Workflow 05 will request that separately after
+presenting the exact dedicated target and load parameters.

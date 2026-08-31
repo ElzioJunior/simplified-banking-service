@@ -1,4 +1,4 @@
-# EPIC-002 — Account-to-Account Money Transfers
+# EPIC002 — Account-to-Account Money Transfers
 
 ## Objective
 
@@ -12,6 +12,8 @@ Implement a REST API for transferring funds between bank accounts while ensuring
 - Adequate performance under heavy load
 - Protection against race conditions
 - Full rollback in case of failure
+- Retry safety through server-issued idempotency tokens
+- Durable asynchronous notification intent for the source account holder
 
 A transfer must be handled as a single transactional operation:
 
@@ -30,16 +32,47 @@ If any step fails, no financial change must remain persisted.
 
 ## API
 
+All endpoints remain temporarily unauthenticated under
+[ADR-0027](../adr/ADR-0027-defer-api-authentication-for-the-initial-scope.md).
+The traceable authentication TODO remains required until bearer-token behavior
+is delivered by a separately approved scope.
+
+### Issue Transfer Token
+
+`POST /api/v1/transfer-tokens`
+
+Successful status: `201 Created`.
+
+The endpoint accepts no business payload and returns:
+
+```json
+{
+  "token": "4bc9a5ab-6bb8-4c45-b8ca-b15cae27e722",
+  "expiresAt": "2026-08-31T19:10:00Z"
+}
+```
+
+The token is valid for 10 minutes and may authorize only one normalized
+transfer payload.
+
 ### Transfer Funds
 
-`POST /transfers`
+`POST /api/v1/transfers`
+
+Successful first-use and identical-replay status: `200 OK`.
+
+Required header:
+
+```http
+Idempotency-Key: 4bc9a5ab-6bb8-4c45-b8ca-b15cae27e722
+```
 
 ### Request
 
 ```json
 {
-  "sourceAccountId": "ACC-001",
-  "destinationAccountId": "ACC-002",
+  "sourceAccountId": 1,
+  "destinationAccountId": 2,
   "amount": 100.00
 }
 ```
@@ -48,13 +81,26 @@ If any step fails, no financial change must remain persisted.
 
 ```json
 {
-  "transferId": "TRF-001",
+  "transferId": "d068799f-c8ab-4be2-9b49-92f7d8c33f44",
   "status": "COMPLETED",
-  "sourceAccountId": "ACC-001",
-  "destinationAccountId": "ACC-002",
+  "sourceAccountId": 1,
+  "destinationAccountId": 2,
   "amount": 100.00
 }
 ```
+
+Reusing the same token with the same normalized payload returns the established
+successful response without another debit, credit, movement pair, or
+notification intent. Reusing it for another payload is rejected.
+
+### Error contract
+
+Errors use safe RFC 9457 Problem Details:
+
+- `400 Bad Request` — malformed input, missing `Idempotency-Key`, or invalid amount.
+- `404 Not Found` — source or destination account does not exist.
+- `409 Conflict` — same account, insufficient funds, or token conflict/expiration.
+- `503 Service Unavailable` — bounded lock timeout, deadlock victim, or database unavailability.
 
 ---
 
@@ -72,6 +118,13 @@ If any step fails, no financial change must remain persisted.
 - Lock contention, timeouts, and deadlocks must be handled in a controlled manner.
 - Load and concurrency tests must be executed using Gatling.
 - Throughput, latency, and error metrics must be available to evaluate the API under load.
+- A server-issued idempotency token must be required for every transfer.
+- An identical retry with the same token must not duplicate financial effects.
+- A token must not authorize another payload and expires after 10 minutes.
+- A successful transfer must durably create exactly one asynchronous
+  notification intent for the source account holder.
+- RabbitMQ publication failure must not roll back or invalidate a successful transfer.
+- Rejected and rolled-back transfers must not create notification intents.
 
 ---
 
@@ -691,4 +744,3 @@ At minimum, the following must be observable:
 The Epic defines **what guarantees and behavior the system must provide**.
 
 The ADRs define **how those guarantees will be technically implemented**.
-

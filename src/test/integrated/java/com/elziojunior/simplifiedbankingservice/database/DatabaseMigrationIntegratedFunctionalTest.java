@@ -40,7 +40,10 @@ class DatabaseMigrationIntegratedFunctionalTest {
      */
     @BeforeEach
     void resetSchemaData() {
-        jdbcTemplate.execute("TRUNCATE TABLE movements, accounts RESTART IDENTITY");
+        jdbcTemplate.execute("""
+                TRUNCATE TABLE transfer_notification_outbox, transfer_idempotency_tokens,
+                    movements, accounts RESTART IDENTITY
+                """);
     }
 
     /**
@@ -169,7 +172,33 @@ class DatabaseMigrationIntegratedFunctionalTest {
     @Test
     void doesNotReapplyAnAlreadyAppliedMigration() {
         assertThat(flyway.migrate().migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+    }
+
+    /**
+     * Proves V2 creates token and outbox constraints/indexes because transfer
+     * retries and notification recovery depend on database-enforced uniqueness.
+     */
+    @Test
+    void createsTransferTokenAndOutboxSchema() {
+        assertColumn("transfer_idempotency_tokens", "token", "uuid", null, null, "NO");
+        assertNullableNumericColumn("transfer_idempotency_tokens", "amount", 19, 2);
+        assertColumn("transfer_notification_outbox", "event_id", "uuid", null, null, "NO");
+        assertColumn("transfer_notification_outbox", "amount", "numeric", null, 2, "NO");
+
+        assertThat(constraintNames("transfer_idempotency_tokens")).contains(
+                "pk_transfer_idempotency_tokens",
+                "uq_transfer_idempotency_tokens_operation",
+                "chk_transfer_tokens_association");
+        assertThat(constraintNames("transfer_notification_outbox")).contains(
+                "pk_transfer_notification_outbox",
+                "uq_transfer_outbox_operation_recipient_event",
+                "chk_transfer_outbox_event_type");
+
+        assertThat(indexNames("transfer_idempotency_tokens"))
+                .contains("idx_transfer_tokens_unused_expiration");
+        assertThat(indexNames("transfer_notification_outbox"))
+                .contains("idx_transfer_outbox_pending");
     }
 
     /**
@@ -204,6 +233,22 @@ class DatabaseMigrationIntegratedFunctionalTest {
         assertThat(metadata.get("is_identity")).isEqualTo(expectedIdentity);
     }
 
+    /** Verifies nullable monetary metadata used before a token is associated. */
+    private void assertNullableNumericColumn(String table, String column, int precision, int scale) {
+        var metadata = jdbcTemplate.queryForMap(
+                """
+                SELECT data_type, numeric_precision, numeric_scale, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+                """,
+                table,
+                column);
+        assertThat(metadata.get("data_type")).isEqualTo("numeric");
+        assertThat(metadata.get("numeric_precision")).isEqualTo(precision);
+        assertThat(metadata.get("numeric_scale")).isEqualTo(scale);
+        assertThat(metadata.get("is_nullable")).isEqualTo("YES");
+    }
+
     /**
      * Retrieves named table constraints so the migration test can detect a
      * missing or accidentally renamed database-enforced invariant.
@@ -211,6 +256,14 @@ class DatabaseMigrationIntegratedFunctionalTest {
     private List<String> constraintNames(String table) {
         return jdbcTemplate.queryForList(
                 "SELECT conname FROM pg_constraint WHERE conrelid = CAST(? AS regclass)",
+                String.class,
+                table);
+    }
+
+    /** Retrieves table index names so performance-critical pending work remains discoverable. */
+    private List<String> indexNames(String table) {
+        return jdbcTemplate.queryForList(
+                "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = ?",
                 String.class,
                 table);
     }

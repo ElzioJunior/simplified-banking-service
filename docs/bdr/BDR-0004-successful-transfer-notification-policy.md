@@ -1,6 +1,6 @@
 # BDR-0004 — Successful Transfer Notification Policy
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-31
 - Deciders: Engineering and Product Team
 - Supersedes: none
@@ -12,16 +12,22 @@ A client should be informed when a financial transfer has been successfully comp
 
 ## Decision
 
-Every successfully completed transfer must create a notification for the client.
+Every successfully completed transfer must create one notification intent for
+the holder of the source account.
 
 Notification rules:
 
 - Notifications are created only for successfully completed transfers.
+- The intended recipient is identified by the source account ID; resolving a
+  delivery address or channel remains outside the current scope.
 - A failed or rejected transfer must not generate a successful-transfer notification.
 - Notification processing must occur asynchronously relative to the transfer request.
 - A notification-delivery failure must not roll back or invalidate a successfully completed financial transfer.
 - A transfer must not produce duplicate notifications for the same intended notification recipient and event.
 - The notification must contain enough transfer context to identify the related transaction without exposing unnecessary sensitive information.
+- For the current scope, notification creation means durably recording the
+  unique asynchronous intent. Successful channel delivery is not part of the
+  synchronous transfer response.
 
 The specific delivery channel is outside the current business scope.
 
