@@ -101,11 +101,14 @@ authentication TODO will reference ADR-0027 and describe its removal condition.
 ## Integrated strategy
 
 The integrated suite uses a random local HTTP port and its own PostgreSQL 17.6
-Testcontainer. Each scenario creates minimal data through the real public API,
-observes the response and final database state, and truncates owned tables
-between scenarios. It uses the production controller, validation, service,
+Testcontainer. Each scenario creates uniquely identifiable minimal data through
+the real public API and scopes database observations to those fixtures without
+clearing tables. A datasource guard proves that the application is connected
+to the running disposable container rather than a transactional/shared
+database. The suite uses the production controller, validation, service,
 repository, Hibernate mapping, security chain, serialization, and Flyway
-migration without mocks.
+migration without mocks; Testcontainers discards the whole database after the
+suite.
 
 The container and HTTP server are disposable local resources with no shared
 state, credentials, cost, or consequential external side effect. Therefore no

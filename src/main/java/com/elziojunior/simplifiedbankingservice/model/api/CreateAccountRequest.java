@@ -1,4 +1,4 @@
-package com.elziojunior.simplifiedbankingservice.api;
+package com.elziojunior.simplifiedbankingservice.model.api;
 
 import java.math.BigDecimal;
 

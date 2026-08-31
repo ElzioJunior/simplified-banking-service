@@ -1,6 +1,6 @@
 # ADR-0026 — Use Server-Issued Idempotency Tokens for Transfers
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-31
 - Deciders: Engineering Team
 - Supersedes: none
@@ -16,14 +16,20 @@ Introduce a server-issued idempotency token for transfer creation.
 
 The flow is:
 
-1. The client requests a transfer idempotency token from a dedicated API.
-2. The server generates and returns a unique token.
+1. The client requests a transfer idempotency token through
+   `POST /api/v1/transfer-tokens`.
+2. The server generates a UUID token and returns it with its expiration instant.
 3. The token is valid for 10 minutes.
-4. The client submits the token with the transfer request.
+4. The client submits the token in the `Idempotency-Key` header of
+   `POST /api/v1/transfers`.
 5. The first valid use of the token is associated with the resulting transfer operation.
 6. Reusing the same token for the same completed operation must return the previously established result and must not create duplicate financial effects.
 7. An expired token must not authorize a new transfer.
 8. A token must not be reused to execute a different transfer payload.
+
+Missing tokens are invalid request input. Unknown, expired, or payload-mismatched
+tokens are idempotency conflicts. Token issuance and expiration timestamps use
+the application clock so behavior remains deterministic in tests.
 
 The exact storage implementation is an internal technical detail, but token uniqueness, expiration, and one-logical-operation semantics are required.
 

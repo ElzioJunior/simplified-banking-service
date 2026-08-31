@@ -7,6 +7,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,18 +37,18 @@ public class CreateAccountService {
      * reach the repository and successful creation has one authoritative UTC
      * timestamp.
      *
-     * @param command requested account data
+     * @param account requested account data
      * @return the generated identifier and persisted account values
      * @throws AccountCreationValidationException when an account invariant is violated
      */
     @Transactional
-    public CreatedAccountDto create(CreateAccountCommand command) {
-        if (command == null) {
+    public CreatedAccountDto create(CreateAccountDto account) {
+        if (account == null) {
             throw new AccountCreationValidationException("Account creation data is required.");
         }
 
-        String name = validateName(command.name());
-        BigDecimal balance = normalizeBalance(command.initialBalance());
+        String name = validateName(account.name());
+        BigDecimal balance = normalizeBalance(account.initialBalance());
         OffsetDateTime createdAt = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
                 .truncatedTo(ChronoUnit.MICROS);
 

@@ -7,6 +7,8 @@ import java.sql.Timestamp;
 import java.time.ZoneOffset;
 import java.util.Map;
 
+import javax.sql.DataSource;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,10 +26,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
-import com.elziojunior.simplifiedbankingservice.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "transfer.notifications.publisher.enabled=false")
 class AccountEntityCreationIntegratedFunctionalTest {
 
     @Container
@@ -40,10 +44,13 @@ class AccountEntityCreationIntegratedFunctionalTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /** Clears owned rows and identities so every HTTP/database scenario is independent. */
+    @Autowired
+    private DataSource dataSource;
+
+    /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach
-    void resetSchemaData() {
-        jdbcTemplate.execute("TRUNCATE TABLE movements, accounts RESTART IDENTITY");
+    void verifyEphemeralDatabase() {
+        EphemeralPostgresGuard.verify(dataSource, POSTGRESQL);
     }
 
     /** Proves unauthenticated HTTP creation persists the complete approved account shape. */
@@ -54,7 +61,7 @@ class AccountEntityCreationIntegratedFunctionalTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         AccountResponse body = response.getBody();
         assertThat(body).isNotNull();
-        assertThat(body.id()).isEqualTo(1L);
+        assertThat(body.id()).isPositive();
         assertThat(body.name()).isEqualTo("Ada Lovelace");
         assertThat(body.balance()).isEqualByComparingTo("100.00");
         assertThat(body.createdAt().getOffset()).isEqualTo(ZoneOffset.UTC);
@@ -78,7 +85,11 @@ class AccountEntityCreationIntegratedFunctionalTest {
         assertThat(first.id()).isNotEqualTo(second.id());
         assertThat(first.balance()).isEqualByComparingTo("0.00");
         assertThat(second.balance()).isEqualByComparingTo("0.00");
-        assertThat(accountCount()).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM accounts WHERE id IN (?, ?)",
+                Integer.class,
+                first.id(),
+                second.id())).isEqualTo(2);
     }
 
     /** Proves HALF_EVEN normalization survives the HTTP, JPA, and PostgreSQL round trip. */
@@ -104,12 +115,15 @@ class AccountEntityCreationIntegratedFunctionalTest {
     /** Proves every invalid request is atomic and returns safe Problem Details. */
     @Test
     void shouldRejectInvalidRequestsWithoutPersistingAccounts() {
-        assertBadRequest(new CreateAccountRequest("   ", BigDecimal.ZERO));
-        assertBadRequest(new CreateAccountRequest("Negative sub-cent", new BigDecimal("-0.001")));
-        assertBadRequest(new CreateAccountRequest(
-                "Overflow after rounding", new BigDecimal("99999999999999999.995")));
+        int countBeforeRequests = accountCount();
 
-        assertThat(accountCount()).isZero();
+        assertBadRequest(new CreateAccountRequest("   ", BigDecimal.ZERO), "Invalid request");
+        assertBadRequest(new CreateAccountRequest("Negative sub-cent", new BigDecimal("-0.001")), "Invalid request");
+        assertBadRequest(new CreateAccountRequest(
+                "Overflow after rounding", new BigDecimal("99999999999999999.995")),
+                "Invalid account creation request");
+
+        assertThat(accountCount()).isEqualTo(countBeforeRequests);
     }
 
     /** Proves unsupported account operations stay absent and operational routes stay protected. */
@@ -139,14 +153,14 @@ class AccountEntityCreationIntegratedFunctionalTest {
                 AccountResponse.class);
     }
 
-    private void assertBadRequest(CreateAccountRequest request) {
+    private void assertBadRequest(CreateAccountRequest request, String title) {
         ResponseEntity<ErrorResponse> response = restTemplate.postForEntity(
                 "/api/v1/accounts", request, ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(response.getBody()).isEqualTo(
-                new ErrorResponse(400, "Invalid account creation request"));
+                new ErrorResponse(400, title));
     }
 
     private int accountCount() {

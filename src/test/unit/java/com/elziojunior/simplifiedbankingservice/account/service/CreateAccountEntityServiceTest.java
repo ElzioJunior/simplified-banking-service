@@ -15,8 +15,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.stream.Stream;
 
-import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountCommand;
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,7 +57,7 @@ class CreateAccountEntityServiceTest {
     void createsAnAccountWithNormalizedValuesAndGeneratedId() {
         stubPersistedAccount(42L, "John Doe", new BigDecimal("123.45"));
 
-        CreatedAccountDto result = service.create(new CreateAccountCommand("John Doe", new BigDecimal("123.450")));
+        CreatedAccountDto result = service.create(new CreateAccountDto("John Doe", new BigDecimal("123.450")));
 
         ArgumentCaptor<AccountEntity> accountCaptor = ArgumentCaptor.forClass(AccountEntity.class);
         verify(accountRepository).save(accountCaptor.capture());
@@ -78,7 +78,7 @@ class CreateAccountEntityServiceTest {
     void acceptsAZeroInitialBalance() {
         stubPersistedAccount(7L, "Zero account", new BigDecimal("0.00"));
 
-        CreatedAccountDto result = service.create(new CreateAccountCommand("Zero account", BigDecimal.ZERO));
+        CreatedAccountDto result = service.create(new CreateAccountDto("Zero account", BigDecimal.ZERO));
 
         assertThat(result.balance()).isEqualByComparingTo("0.00");
         verify(accountRepository).save(any(AccountEntity.class));
@@ -93,7 +93,7 @@ class CreateAccountEntityServiceTest {
     void normalizesInitialBalanceUsingHalfEven(BigDecimal requested, BigDecimal expected) {
         stubPersistedAccount(9L, "Rounded account", expected);
 
-        service.create(new CreateAccountCommand("Rounded account", requested));
+        service.create(new CreateAccountDto("Rounded account", requested));
 
         ArgumentCaptor<AccountEntity> accountCaptor = ArgumentCaptor.forClass(AccountEntity.class);
         verify(accountRepository).save(accountCaptor.capture());
@@ -107,7 +107,7 @@ class CreateAccountEntityServiceTest {
     @ParameterizedTest
     @MethodSource("invalidNames")
     void rejectsInvalidNamesBeforePersistence(String invalidName) {
-        assertThatThrownBy(() -> service.create(new CreateAccountCommand(invalidName, BigDecimal.ZERO)))
+        assertThatThrownBy(() -> service.create(new CreateAccountDto(invalidName, BigDecimal.ZERO)))
                 .isInstanceOf(AccountCreationValidationException.class);
 
         verify(accountRepository, never()).save(any());
@@ -120,7 +120,7 @@ class CreateAccountEntityServiceTest {
     @ParameterizedTest
     @MethodSource("negativeBalances")
     void rejectsNegativeInputBeforeNormalization(BigDecimal negativeBalance) {
-        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", negativeBalance)))
+        assertThatThrownBy(() -> service.create(new CreateAccountDto("John Doe", negativeBalance)))
                 .isInstanceOf(AccountCreationValidationException.class)
                 .hasMessage("Initial balance must be greater than or equal to zero.");
 
@@ -130,7 +130,7 @@ class CreateAccountEntityServiceTest {
     /** Proves a missing monetary value cannot reach persistence. */
     @Test
     void rejectsMissingInitialBalanceBeforePersistence() {
-        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", null)))
+        assertThatThrownBy(() -> service.create(new CreateAccountDto("John Doe", null)))
                 .isInstanceOf(AccountCreationValidationException.class)
                 .hasMessage("Initial balance is required.");
 
@@ -145,7 +145,7 @@ class CreateAccountEntityServiceTest {
     void rejectsBalanceThatOverflowsAfterNormalization() {
         BigDecimal overflowsAfterRounding = new BigDecimal("99999999999999999.995");
 
-        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", overflowsAfterRounding)))
+        assertThatThrownBy(() -> service.create(new CreateAccountDto("John Doe", overflowsAfterRounding)))
                 .isInstanceOf(AccountCreationValidationException.class)
                 .hasMessage("Initial balance exceeds the supported monetary range.");
 

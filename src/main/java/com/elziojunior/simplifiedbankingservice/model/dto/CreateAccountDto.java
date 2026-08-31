@@ -1,4 +1,4 @@
-package com.elziojunior.simplifiedbankingservice.service;
+package com.elziojunior.simplifiedbankingservice.model.dto;
 
 import java.math.BigDecimal;
 
@@ -8,5 +8,5 @@ import java.math.BigDecimal;
  * @param name account-holder name
  * @param initialBalance requested opening balance before monetary normalization
  */
-public record CreateAccountCommand(String name, BigDecimal initialBalance) {
+public record CreateAccountDto(String name, BigDecimal initialBalance) {
 }

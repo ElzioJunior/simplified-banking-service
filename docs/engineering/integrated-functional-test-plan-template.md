@@ -33,7 +33,7 @@ invalidate the risk being qualified.>
 - Infrastructure: <ephemeral database/broker/container/etc.>
 - External runtime/provider: <configurable resource>
 - Observability: <how the final outcome is asserted>
-- Isolation and cleanup: <strategy>
+- Isolation and resource lifecycle: <disposable database, fixture scoping, and non-database cleanup strategy>
 
 ## Scenario matrix
 
@@ -63,4 +63,7 @@ preparation stops immediately before this point until the user authorizes it.>
 - [ ] A shallow transport acknowledgement cannot pass without the expected
       final application outcome.
 - [ ] Secrets remain outside version control and tool output.
-- [ ] Each scenario is isolated, repeatable, and cleaned up.
+- [ ] Each scenario uses unique fixtures and fixture-scoped assertions without
+      clearing database tables.
+- [ ] The disposable database is distinct from every transactional/shared
+      database and is discarded as a whole after the suite.

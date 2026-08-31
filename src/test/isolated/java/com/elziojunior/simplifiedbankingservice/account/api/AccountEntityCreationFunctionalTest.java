@@ -26,14 +26,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountCommand;
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapperImpl;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfiguration;
 
 @WebMvcTest(AccountController.class)
-@Import({ApiExceptionHandler.class, SecurityConfiguration.class})
+@Import({ApiExceptionHandler.class, SecurityConfiguration.class, AccountMapperImpl.class})
 class AccountEntityCreationFunctionalTest {
 
     @Autowired
@@ -45,7 +46,7 @@ class AccountEntityCreationFunctionalTest {
     /** Proves the public endpoint returns the complete 201 creation contract. */
     @Test
     void shouldCreateAccountWithoutAuthenticationOrCsrfToken() throws Exception {
-        when(createAccountService.create(any(CreateAccountCommand.class))).thenReturn(new CreatedAccountDto(
+        when(createAccountService.create(any(CreateAccountDto.class))).thenReturn(new CreatedAccountDto(
                 41L,
                 "Ada Lovelace",
                 new BigDecimal("100.00"),
@@ -63,17 +64,17 @@ class AccountEntityCreationFunctionalTest {
                 .andExpect(jsonPath("$.createdAt").value("2026-08-31T13:45:00Z"));
 
         verify(createAccountService).create(
-                new CreateAccountCommand("Ada Lovelace", new BigDecimal("100")));
+                new CreateAccountDto("Ada Lovelace", new BigDecimal("100")));
     }
 
     /** Proves missing, blank, and oversized names fail before application invocation. */
     @Test
     void shouldRejectInvalidNamesWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{\"initialBalance\":0}", "The account creation request is invalid.");
-        assertBadRequest("{\"name\":\"   \",\"initialBalance\":0}", "The account creation request is invalid.");
+        assertBadRequest("{\"initialBalance\":0}", "Invalid request", "The request is invalid.");
+        assertBadRequest("{\"name\":\"   \",\"initialBalance\":0}", "Invalid request", "The request is invalid.");
         assertBadRequest(
                 "{\"name\":\"" + "a".repeat(256) + "\",\"initialBalance\":0}",
-                "The account creation request is invalid.");
+                "Invalid request", "The request is invalid.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -81,9 +82,9 @@ class AccountEntityCreationFunctionalTest {
     /** Proves null and negative balances fail at the transport validation boundary. */
     @Test
     void shouldRejectInvalidBalancesWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{\"name\":\"Ada\"}", "The account creation request is invalid.");
+        assertBadRequest("{\"name\":\"Ada\"}", "Invalid request", "The request is invalid.");
         assertBadRequest("{\"name\":\"Ada\",\"initialBalance\":-0.001}",
-                "The account creation request is invalid.");
+                "Invalid request", "The request is invalid.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -91,7 +92,7 @@ class AccountEntityCreationFunctionalTest {
     /** Proves malformed JSON is rejected without exposing parser internals. */
     @Test
     void shouldRejectMalformedJsonWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{not-json", "The request body is invalid or unreadable.");
+        assertBadRequest("{not-json", "Invalid request", "The request body is invalid or unreadable.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -104,7 +105,7 @@ class AccountEntityCreationFunctionalTest {
 
         assertBadRequest(
                 "{\"name\":\"Ada\",\"initialBalance\":99999999999999999.995}",
-                "Initial balance exceeds the supported monetary range.");
+                "Invalid account creation request", "Initial balance exceeds the supported monetary range.");
     }
 
     /** Proves unapproved account read, list, update, and deletion operations remain absent. */
@@ -129,14 +130,14 @@ class AccountEntityCreationFunctionalTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private void assertBadRequest(String content, String detail) throws Exception {
+    private void assertBadRequest(String content, String title, String detail) throws Exception {
         mockMvc.perform(post("/api/v1/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(content))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.title").value("Invalid account creation request"))
+                .andExpect(jsonPath("$.title").value(title))
                 .andExpect(jsonPath("$.detail").value(detail));
     }
 }

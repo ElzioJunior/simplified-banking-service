@@ -21,6 +21,9 @@
         <java.version>21</java.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
+        <gatling.version>3.15.1</gatling.version>
+        <gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
         <surefireArgLine></surefireArgLine>
     </properties>
 
@@ -62,6 +65,11 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -81,6 +89,11 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>rabbitmq</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -110,6 +123,19 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -192,9 +218,10 @@
                             </rules>
                             <excludes>
                                 <exclude>**/*Application.class</exclude>
-                                <exclude>**/account/model/Account.class</exclude>
-                                <exclude>**/account/api/CreateAccountRequest.class</exclude>
-                                <exclude>**/account/api/AccountResponse.class</exclude>
+                                <exclude>**/model/entity/*.class</exclude>
+                                <exclude>**/model/api/*.class</exclude>
+                                <exclude>**/model/dto/*.class</exclude>
+                                <exclude>**/model/mapper/*Impl.class</exclude>
                                 <exclude>**/configuration/SecurityConfiguration.class</exclude>
                                 <exclude>**/configuration/TimeConfiguration.class</exclude>
                             </excludes>
@@ -246,6 +273,45 @@
                                 </configuration>
                             </execution>
                         </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>load-tests</id>
+            <dependencies>
+                <dependency>
+                    <groupId>io.gatling.highcharts</groupId>
+                    <artifactId>gatling-charts-highcharts</artifactId>
+                    <version>${gatling.version}</version>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <version>${build-helper-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>add-gatling-test-source-set</id>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/test/gatling/java</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>io.gatling</groupId>
+                        <artifactId>gatling-maven-plugin</artifactId>
+                        <version>${gatling-maven-plugin.version}</version>
                     </plugin>
                 </plugins>
             </build>

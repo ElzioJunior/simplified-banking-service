@@ -20,8 +20,8 @@ baseline from the coding standard:
 
 - every method with light or greater complexity states in JavaDoc what it does
   and why it exists;
-- properties of records, DTOs, entities, configuration objects, commands,
-  events, and results have concise documentation;
+- properties of records, DTOs, entities, configuration objects, events, and
+  results have concise documentation;
 - every test method explains the behavior or failure it proves and why that
   scenario matters;
 - documentation remains accurate after the final code change.
