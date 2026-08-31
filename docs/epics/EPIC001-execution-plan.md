@@ -115,13 +115,22 @@ finalization.
 
 ## Checkpoint
 
-- Status: in progress
-- Completed slices: 1–3
+- Status: completed on 2026-08-31
+- Completed slices: 1–4
 - Validation evidence:
-  - `./mvnw -B -ntp clean test` — 13 core unit scenarios passed at slice 1
-  - `./mvnw -B -ntp clean verify` — 17 unit and 7 isolated functional
-    scenarios passed with the 90% eligible-code coverage gate at slice 2
+  - `./mvnw -B -ntp clean test` — 17 unit tests passed
+  - `./mvnw -B -ntp clean verify` — 17 unit and 7 isolated functional tests
+    passed with the 90% eligible-code coverage gate
   - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 17 unit,
-    7 isolated functional, and 11 integrated scenarios passed; the integrated
-    total comprises 5 account HTTP/PostgreSQL and 6 migration scenarios
-- Next action: run final quality gates, review, and documentation synchronization
+    7 isolated functional, and 11 integrated tests passed; the integrated total
+    comprises 5 account HTTP/PostgreSQL and 6 migration scenarios
+  - `docker compose config --quiet` — passed
+- Review result: no unresolved BLOCKER or HIGH finding; review-completeness
+  findings for unsupported account methods, Problem Details media type, and
+  required JavaDoc were applied and the affected gates rerun successfully
+- Integrated boundary: disposable local Testcontainers only; no consequential
+  real-boundary authorization gate applied
+- Delivery commits: `adc8391`, `2d84765`, and `50ef551`, followed by the
+  final review/documentation checkpoint in branch history
+- Remaining limitation: bearer-token authentication is intentionally deferred
+  under ADR-0027; the service must not be exposed to an untrusted network

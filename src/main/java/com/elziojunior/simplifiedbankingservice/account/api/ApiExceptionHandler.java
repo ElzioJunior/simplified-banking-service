@@ -31,6 +31,7 @@ public class ApiExceptionHandler {
         return badRequest(exception.getMessage());
     }
 
+    /** Builds the shared client-safe 400 shape required by the API error contract. */
     private ProblemDetail badRequest(String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setTitle("Invalid account creation request");

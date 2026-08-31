@@ -6,7 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -102,10 +105,16 @@ class AccountCreationFunctionalTest {
                 "Initial balance exceeds the supported monetary range.");
     }
 
-    /** Proves unapproved account query and deletion routes remain absent. */
+    /** Proves unapproved account read, list, update, and deletion operations remain absent. */
     @Test
     void shouldReturnNotFoundForUnsupportedAccountRoutes() throws Exception {
+        mockMvc.perform(get("/api/v1/accounts"))
+                .andExpect(status().isMethodNotAllowed());
         mockMvc.perform(get("/api/v1/accounts/41"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(put("/api/v1/accounts/41"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(patch("/api/v1/accounts/41"))
                 .andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/v1/accounts/41"))
                 .andExpect(status().isNotFound());
@@ -123,6 +132,7 @@ class AccountCreationFunctionalTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(content))
                 .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.title").value("Invalid account creation request"))
                 .andExpect(jsonPath("$.detail").value(detail));

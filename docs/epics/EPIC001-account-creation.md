@@ -19,6 +19,12 @@ The system must:
 - Persist the account creation timestamp.
 - Return the created account information.
 
+## Delivery status
+
+Completed on 2026-08-31. The delivered scope is limited to the documented
+creation endpoint and uses the existing Flyway V1 schema; no database migration
+or additional account-management operation was introduced.
+
 ---
 
 ## API

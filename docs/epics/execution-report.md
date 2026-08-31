@@ -7,7 +7,7 @@ This is the single execution report for all epic execution plans.
 | Epic | Execution plan | Status | Latest checkpoint |
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
-| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | In progress | Real HTTP/PostgreSQL suite passed |
+| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Backlog | Workflow 01 not started |
 
 ## Completed foundation work
@@ -65,9 +65,9 @@ repository. Independent review found no unresolved BLOCKER or HIGH issue.
 - `6ceeb2b` — execution-plan placeholders for the remaining epics.
 - `f9dfa04` — opt-in PostgreSQL migration verification suite.
 
-## Active plan: EPIC001
+## Completed plan: EPIC001
 
-### What will be implemented
+### What was implemented
 
 Only `POST /api/v1/accounts`: an application service, JPA mapping and
 repository over the existing V1 schema, versioned MVC API, RFC 9457 validation
@@ -109,21 +109,43 @@ including successful persistence, unique IDs, monetary round trips, timestamps,
 and invalid-request atomicity. These are local disposable boundaries, so no
 consequential Workflow 05 authorization gate applies.
 
-At the latest checkpoint, the persistence/use-case slice and HTTP/security
-slice are complete. `./mvnw -B -ntp clean verify` passed 17 unit tests and 7
-isolated MVC scenarios, including the 90% eligible-code line-coverage gate.
-The opt-in integrated lifecycle also passed 5 account-creation scenarios and
-the existing 6 migration scenarios against disposable PostgreSQL 17.6
-containers. During integrated verification, timestamp values were aligned to
-PostgreSQL microsecond precision and servlet security configuration was scoped
-away from non-web application contexts.
+The persistence/use-case, HTTP/security, and integrated slices are complete.
+`./mvnw -B -ntp clean verify` passed 17 unit tests and 7 isolated MVC
+scenarios, including the 90% eligible-code line-coverage gate. The opt-in
+integrated lifecycle also passed 5 account-creation scenarios and the existing
+6 migration scenarios against disposable PostgreSQL 17.6 containers. During
+integrated verification, timestamp values were aligned to PostgreSQL
+microsecond precision and servlet security configuration was scoped away from
+non-web application contexts.
+
+Final quality and review reruns passed on 2026-08-31: 17 unit tests, 7 isolated
+MVC tests, 5 real account HTTP/PostgreSQL tests, the existing 6 real migration
+tests, the 90% eligible-code coverage gate, and
+`docker compose config --quiet`. Review found no unresolved BLOCKER or HIGH
+issue. Its completeness
+findings added explicit list/update-route absence checks, Problem Details media
+type assertions, and the required exception-mapping JavaDoc. No lint,
+static-analysis, dependency/security scanner, or separate schema-quality tool
+is configured, so none is claimed.
+
+### Delivery commits
+
+- `adc8391` — account persistence/use-case core, unit tests, ADR-0027, and
+  approved planning artifacts.
+- `2d84765` — versioned creation API, Problem Details, temporary security
+  configuration, and isolated tests.
+- `50ef551` — mock-free HTTP/PostgreSQL suite and integrated compatibility
+  fixes.
+- Final review fixes and documentation are recorded by the subsequent
+  finalization commit in branch history.
 
 ## Source control
 
-EPIC001 planning changes remain uncommitted for review. After authorization,
-normal coherent non-destructive commits and pushes are part of this plan.
+EPIC001 was delivered in coherent non-destructive commits on `feature/ep001`.
 Force-push, history rewriting, pull requests, deployments, and releases remain
-excluded unless explicitly requested.
+excluded because none was requested. Unrelated worktree changes for the Agent
+Skills/workflows migration and other epic filename normalization were preserved
+outside EPIC001 commits.
 
 ## Authorization request
 

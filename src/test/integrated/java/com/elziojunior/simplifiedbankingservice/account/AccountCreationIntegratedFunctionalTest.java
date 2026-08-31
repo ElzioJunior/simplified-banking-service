@@ -17,6 +17,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -115,7 +116,15 @@ class AccountCreationIntegratedFunctionalTest {
     /** Proves unsupported account operations stay absent and operational routes stay protected. */
     @Test
     void shouldPreserveApiAndOperationalSecurityBoundaries() {
+        assertThat(restTemplate.getForEntity("/api/v1/accounts", String.class).getStatusCode())
+                .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(restTemplate.getForEntity("/api/v1/accounts/1", String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(restTemplate.exchange(
+                "/api/v1/accounts/1", HttpMethod.PUT, HttpEntity.EMPTY, String.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(restTemplate.exchange(
+                "/api/v1/accounts/1", HttpMethod.PATCH, HttpEntity.EMPTY, String.class).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(restTemplate.exchange(
                 "/api/v1/accounts/1", HttpMethod.DELETE, HttpEntity.EMPTY, String.class).getStatusCode())
@@ -136,6 +145,7 @@ class AccountCreationIntegratedFunctionalTest {
                 "/api/v1/accounts", request, ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(response.getBody()).isEqualTo(
                 new ErrorResponse(400, "Invalid account creation request"));
     }
