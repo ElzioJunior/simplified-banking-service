@@ -8,6 +8,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.dao.CannotAcquireLockException;
 
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class TransferMetricsTest {

@@ -1,4 +1,4 @@
-package com.elziojunior.simplifiedbankingservice.service;
+package com.elziojunior.simplifiedbankingservice.exception;
 
 /** Signals a business or idempotency conflict that maps safely to HTTP 409. */
 public class TransferConflictException extends RuntimeException {

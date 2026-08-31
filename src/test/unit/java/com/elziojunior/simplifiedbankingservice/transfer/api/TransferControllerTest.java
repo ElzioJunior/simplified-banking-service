@@ -10,11 +10,11 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-import com.elziojunior.simplifiedbankingservice.api.CreateTransferRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateTransferRequest;
 import com.elziojunior.simplifiedbankingservice.api.TransferController;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferCommand;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
 
@@ -28,7 +28,7 @@ class TransferControllerTest {
         CreateTransferService service = mock(CreateTransferService.class);
         UUID token = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID transferId = UUID.fromString("00000000-0000-0000-0000-000000000002");
-        CreateTransferCommand command = new CreateTransferCommand(token, 1L, 2L, new BigDecimal("12.345"));
+        CreateTransferDto command = new CreateTransferDto(token, 1L, 2L, new BigDecimal("12.345"));
         when(service.create(command)).thenReturn(
                 new CompletedTransferDto(transferId, 1L, 2L, new BigDecimal("12.34")));
 

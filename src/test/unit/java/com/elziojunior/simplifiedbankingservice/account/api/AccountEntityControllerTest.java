@@ -10,10 +10,10 @@ import java.time.OffsetDateTime;
 
 import com.elziojunior.simplifiedbankingservice.api.AccountController;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
-import com.elziojunior.simplifiedbankingservice.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import org.junit.jupiter.api.Test;
 
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountCommand;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 
@@ -24,7 +24,7 @@ class AccountEntityControllerTest {
     void shouldMapCreationRequestAndResult() {
         CreateAccountService service = mock(CreateAccountService.class);
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
-        when(service.create(new CreateAccountCommand("Ada", new BigDecimal("12.345"))))
+        when(service.create(new CreateAccountDto("Ada", new BigDecimal("12.345"))))
                 .thenReturn(new CreatedAccountDto(7L, "Ada", new BigDecimal("12.34"), createdAt));
         AccountController controller = new AccountController(service);
 
@@ -33,6 +33,6 @@ class AccountEntityControllerTest {
 
         assertThat(response).isEqualTo(
                 new AccountResponse(7L, "Ada", new BigDecimal("12.34"), createdAt));
-        verify(service).create(new CreateAccountCommand("Ada", new BigDecimal("12.345")));
+        verify(service).create(new CreateAccountDto("Ada", new BigDecimal("12.345")));
     }
 }

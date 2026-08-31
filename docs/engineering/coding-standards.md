@@ -35,11 +35,14 @@ Services should follow clear internal layers and dependency direction.
 
 Typical packages/layers:
 
-- `api` — HTTP/API controllers and transport adapters.
-- `dto` — request/response transport structures; prefer Java records.
+- `api` — HTTP controllers and transport adapters only.
+- `model.api` — HTTP request and response models; prefer Java records.
+- `model.dto` — application/service input and output DTOs; prefer Java records.
+- `model.entity` — persistence entities and persistence-owned enums.
+- `exception` — application-specific exception types shared across layers.
 - `service` — application orchestration and business behavior.
 - `repository` — persistence access.
-- `config` — Spring and infrastructure configuration.
+- `configuration` — Spring and infrastructure configuration.
 
 Additional domain or integration packages may be introduced when genuinely required.
 
@@ -57,9 +60,17 @@ Dependencies should generally flow from API/integration boundaries toward applic
 
 ## DTOs
 
-- Use Java records by default for immutable request, response, event, command, and transport structures when appropriate.
+- Use Java records by default for immutable request, response, DTO, event, and transport structures when appropriate.
 - DTOs contain data and transport-level validation; they do not contain business behavior.
 - Use explicit names that communicate direction and purpose.
+- Place HTTP request and response models under `model.api`, not alongside
+  controllers in `api`. Name them with the `Request` or `Response` suffix that
+  describes their boundary role.
+- Place application/service input and output DTOs under `model.dto` and name
+  them with the `Dto` suffix. Do not introduce `Command`-suffixed application
+  input types; represent those inputs as purpose-specific DTOs instead.
+- Event and notification records may retain purpose-specific event names when
+  they are not service input or output DTOs.
 - Do not reuse one generic DTO across unrelated use cases merely to reduce class count.
 - Do not expose persistence entities as DTOs.
 
@@ -142,7 +153,7 @@ complexity and for data carried by application-owned objects.
   and self-evident constant getters do not require JavaDoc unless they expose a
   non-obvious contract.
 - Document properties of application-owned records, DTOs, entities,
-  configuration objects, commands, events, and results. Keep property
+  configuration objects, events, and results. Keep property
   documentation deliberately short: a phrase describing the value, unit, or
   role is sufficient. Prefer record-level `@param` tags for record components
   and field JavaDoc for entity/configuration fields.
@@ -237,6 +248,8 @@ Avoid:
 
 ## Error Handling
 
+- Place application-specific exception types under the root `exception`
+  package rather than in `service`, `api`, or model packages.
 - Fail explicitly when an operation cannot satisfy its contract.
 - Do not silently swallow exceptions.
 - Do not catch broad exceptions without a concrete recovery, translation, logging, or boundary-handling reason.

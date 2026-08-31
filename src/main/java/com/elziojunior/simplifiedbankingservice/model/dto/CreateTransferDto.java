@@ -1,4 +1,4 @@
-package com.elziojunior.simplifiedbankingservice.service;
+package com.elziojunior.simplifiedbankingservice.model.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import java.util.UUID;
  * @param destinationAccountId account to credit
  * @param amount requested monetary amount
  */
-public record CreateTransferCommand(
+public record CreateTransferDto(
         UUID token,
         Long sourceAccountId,
         Long destinationAccountId,

@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
-import com.elziojunior.simplifiedbankingservice.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,

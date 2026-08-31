@@ -13,7 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
@@ -62,8 +66,8 @@ public class CreateTransferService {
      * all-or-nothing across balances, movements, token, and notification intent.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public CompletedTransferDto create(CreateTransferCommand command) {
-        ValidatedTransfer requested = validate(command);
+    public CompletedTransferDto create(CreateTransferDto transfer) {
+        ValidatedTransfer requested = validate(transfer);
         lockTimeoutConfigurer.configureCurrentTransaction();
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
                 .truncatedTo(ChronoUnit.MICROS);
@@ -102,18 +106,19 @@ public class CreateTransferService {
     }
 
     /** Validates transport-independent invariants before any lock or persistence interaction. */
-    private ValidatedTransfer validate(CreateTransferCommand command) {
-        if (command == null || command.token() == null) {
+    private ValidatedTransfer validate(CreateTransferDto transfer) {
+        if (transfer == null || transfer.token() == null) {
             throw new TransferValidationException("An idempotency token is required.");
         }
-        if (command.sourceAccountId() == null || command.destinationAccountId() == null) {
+        if (transfer.sourceAccountId() == null || transfer.destinationAccountId() == null) {
             throw new TransferValidationException("Source and destination accounts are required.");
         }
-        if (command.sourceAccountId().equals(command.destinationAccountId())) {
+        if (transfer.sourceAccountId().equals(transfer.destinationAccountId())) {
             throw new TransferConflictException("Source and destination accounts must be different.");
         }
-        BigDecimal amount = normalizeAmount(command.amount());
-        return new ValidatedTransfer(command.token(), command.sourceAccountId(), command.destinationAccountId(), amount);
+        BigDecimal amount = normalizeAmount(transfer.amount());
+        return new ValidatedTransfer(
+                transfer.token(), transfer.sourceAccountId(), transfer.destinationAccountId(), amount);
     }
 
     /** Applies ADR-0022 and rejects values that cannot represent a positive NUMERIC(19,2) amount. */

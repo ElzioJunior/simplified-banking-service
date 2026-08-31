@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
-import com.elziojunior.simplifiedbankingservice.service.TransferConflictException;
-import com.elziojunior.simplifiedbankingservice.service.TransferNotFoundException;
-import com.elziojunior.simplifiedbankingservice.service.TransferValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 
 /** Translates expected client errors into a stable and safe RFC 9457 response. */
 @RestControllerAdvice

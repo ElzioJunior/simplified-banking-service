@@ -8,6 +8,10 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.stereotype.Component;
 
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
+
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;

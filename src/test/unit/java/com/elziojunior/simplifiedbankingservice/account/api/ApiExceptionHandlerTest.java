@@ -15,10 +15,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
-import com.elziojunior.simplifiedbankingservice.service.TransferConflictException;
-import com.elziojunior.simplifiedbankingservice.service.TransferNotFoundException;
-import com.elziojunior.simplifiedbankingservice.service.TransferValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 
 class ApiExceptionHandlerTest {
 

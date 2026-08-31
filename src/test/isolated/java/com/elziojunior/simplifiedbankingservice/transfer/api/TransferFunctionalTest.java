@@ -29,11 +29,11 @@ import com.elziojunior.simplifiedbankingservice.api.TransferTokenController;
 import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfiguration;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferCommand;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
-import com.elziojunior.simplifiedbankingservice.service.TransferConflictException;
-import com.elziojunior.simplifiedbankingservice.service.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
 
 import java.util.function.Supplier;
@@ -78,7 +78,7 @@ class TransferFunctionalTest {
     /** Proves transfer execution maps the public header, body, and completed response. */
     @Test
     void shouldCreateTransferWithoutAuthenticationOrCsrf() throws Exception {
-        CreateTransferCommand command = new CreateTransferCommand(TOKEN, 1L, 2L, new BigDecimal("12.345"));
+        CreateTransferDto command = new CreateTransferDto(TOKEN, 1L, 2L, new BigDecimal("12.345"));
         when(createTransferService.create(command)).thenReturn(
                 new CompletedTransferDto(TRANSFER_ID, 1L, 2L, new BigDecimal("12.34")));
 

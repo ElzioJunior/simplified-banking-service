@@ -26,8 +26,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountCommand;
+import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfiguration;
@@ -45,7 +45,7 @@ class AccountEntityCreationFunctionalTest {
     /** Proves the public endpoint returns the complete 201 creation contract. */
     @Test
     void shouldCreateAccountWithoutAuthenticationOrCsrfToken() throws Exception {
-        when(createAccountService.create(any(CreateAccountCommand.class))).thenReturn(new CreatedAccountDto(
+        when(createAccountService.create(any(CreateAccountDto.class))).thenReturn(new CreatedAccountDto(
                 41L,
                 "Ada Lovelace",
                 new BigDecimal("100.00"),
@@ -63,7 +63,7 @@ class AccountEntityCreationFunctionalTest {
                 .andExpect(jsonPath("$.createdAt").value("2026-08-31T13:45:00Z"));
 
         verify(createAccountService).create(
-                new CreateAccountCommand("Ada Lovelace", new BigDecimal("100")));
+                new CreateAccountDto("Ada Lovelace", new BigDecimal("100")));
     }
 
     /** Proves missing, blank, and oversized names fail before application invocation. */

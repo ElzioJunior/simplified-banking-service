@@ -25,7 +25,11 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.TransferIdempotencyTokenEntity;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
@@ -184,8 +188,8 @@ class CreateTransferServiceTest {
         verify(outboxRepository, never()).save(any());
     }
 
-    private CreateTransferCommand command(long sourceId, long destinationId, String amount) {
-        return new CreateTransferCommand(TOKEN, sourceId, destinationId, new BigDecimal(amount));
+    private CreateTransferDto command(long sourceId, long destinationId, String amount) {
+        return new CreateTransferDto(TOKEN, sourceId, destinationId, new BigDecimal(amount));
     }
 
     private AccountEntity account(long id, String balance) {

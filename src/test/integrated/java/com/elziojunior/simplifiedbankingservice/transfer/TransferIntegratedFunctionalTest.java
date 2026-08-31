@@ -39,8 +39,8 @@ import org.testcontainers.DockerClientFactory;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.elziojunior.simplifiedbankingservice.api.CreateAccountRequest;
-import com.elziojunior.simplifiedbankingservice.api.CreateTransferRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.model.api.CreateTransferRequest;
 import com.elziojunior.simplifiedbankingservice.configuration.TransferNotificationConfiguration;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;

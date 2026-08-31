@@ -2,6 +2,7 @@ package com.elziojunior.simplifiedbankingservice.api;
 
 import java.util.UUID;
 
+import com.elziojunior.simplifiedbankingservice.model.api.CreateTransferRequest;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -12,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferCommand;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
 
@@ -40,7 +41,7 @@ public class TransferController {
             @RequestHeader("Idempotency-Key") UUID token,
             @Valid @RequestBody CreateTransferRequest request) {
         CompletedTransferDto transfer = transferMetrics.observe(() -> createTransferService.create(
-                new CreateTransferCommand(
+                new CreateTransferDto(
                         token, request.sourceAccountId(), request.destinationAccountId(), request.amount())));
         LOGGER.info("Transfer request completed with operationId={}", transfer.transferId());
         return new TransferResponse(
