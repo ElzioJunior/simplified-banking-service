@@ -9,3 +9,9 @@ Use a stable project-defined identifier such as `EP001` or `FEATURE-123`.
 
 These artifacts must link to governing product documents and decisions. They do
 not replace ADRs, BDRs, engineering standards, or the logical data model.
+
+## Current artifacts
+
+- [FEATURE-001 — Project Foundation](FEATURE-001-project-foundation.md)
+- [FEATURE-001 — Execution Plan](FEATURE-001-execution-plan.md)
+- [FEATURE-001 — Development Execution Report](FEATURE-001-execution-report.md)

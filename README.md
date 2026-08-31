@@ -7,7 +7,9 @@ as primary constraints.
 
 The repository is currently documentation-first: the product behavior,
 business rules, architecture choices, engineering standards, and AI-assisted
-delivery workflows are defined before application implementation begins.
+delivery workflows were defined before application implementation began. The
+application foundation is now available; account and transfer features remain
+planned rather than implemented.
 
 ## Current scope
 
@@ -91,6 +93,65 @@ status is visible in the source documents under `docs/`.
 
 Repository-wide contribution instructions are defined in [AGENTS.md](AGENTS.md).
 
+## Development
+
+### Prerequisites
+
+- Java 21 or later.
+- Docker with Docker Compose for local PostgreSQL and RabbitMQ.
+
+The Maven Wrapper downloads the repository's configured Maven version, so a
+host Maven installation is not required.
+
+### Build and test
+
+```bash
+./mvnw test
+./mvnw verify
+```
+
+Unit tests belong under `src/test/unit/java`. Isolated functional tests belong
+under `src/test/isolated/java` and join the normal `verify` lifecycle. The
+real-boundary integrated source set is opt-in:
+
+```bash
+./mvnw -Pintegrated-functional-tests verify
+```
+
+### Run locally
+
+Start PostgreSQL and RabbitMQ:
+
+```bash
+docker compose up -d --wait postgres rabbitmq
+```
+
+Then start the application:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Local ports and credentials can be overridden through the variables documented
+in `.env.example`. Application connection settings can be overridden through
+`DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `RABBITMQ_HOST`,
+`RABBITMQ_PORT`, `RABBITMQ_USERNAME`, and `RABBITMQ_PASSWORD`.
+
+Stop local infrastructure with:
+
+```bash
+docker compose down
+```
+
+### Build the application image
+
+```bash
+docker build -t simplified-banking-service .
+```
+
+The image runs as a non-root user and expects PostgreSQL and RabbitMQ connection
+settings through the same environment variables used for local execution.
+
 ## Branching model
 
 - `main` contains stable, validated releases.
@@ -100,9 +161,11 @@ Repository-wide contribution instructions are defined in [AGENTS.md](AGENTS.md).
 
 ## Development status
 
-The application has not been implemented yet, so build and local-run commands
-will be added with the first implementation slice. Once the Maven Wrapper is
-available, the canonical validation command will be:
+The bootable application foundation, dependency management, separated test
+source sets, and local infrastructure are implemented. No account, transfer,
+movement, notification, or database-migration feature has been implemented.
+
+The canonical validation command is:
 
 ```bash
 ./mvnw verify
