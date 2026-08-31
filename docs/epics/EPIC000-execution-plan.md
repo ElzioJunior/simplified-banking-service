@@ -44,10 +44,13 @@ or consequential external system are involved.
 ## Checkpoint
 
 - Status: in progress
-- Completed slices: 1
+- Completed slices: 1 and 2
 - Validation evidence:
   - `./mvnw -B -ntp clean verify` — passed
+  - `./mvnw -B -ntp test` — passed without Docker
+  - `./mvnw -B -ntp verify` — passed without Docker
+  - `./mvnw -B -ntp -Pintegrated-functional-tests verify` — 6 tests passed against disposable PostgreSQL 17.6
   - `docker compose config --quiet` — passed
   - Clean PostgreSQL 17.6 application startup — V1 applied successfully
   - Schema inspection — `accounts`, `movements`, Flyway history, and expected indexes present
-- Next action: implement the PostgreSQL Testcontainers integrated suite
+- Next action: run final quality gates, review, and documentation synchronization
