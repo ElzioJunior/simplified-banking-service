@@ -14,4 +14,4 @@ Start from [the ADR template](ADR-template.md) and maintain an index below.
 
 ## Index
 
-- None yet.
+- [ADR-0027 — Defer API Authentication for the Initial Scope](ADR-0027-defer-api-authentication-for-the-initial-scope.md)

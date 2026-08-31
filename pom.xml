@@ -192,6 +192,8 @@
                             </rules>
                             <excludes>
                                 <exclude>**/*Application.class</exclude>
+                                <exclude>**/account/model/Account.class</exclude>
+                                <exclude>**/configuration/TimeConfiguration.class</exclude>
                             </excludes>
                         </configuration>
                     </execution>

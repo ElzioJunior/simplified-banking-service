@@ -1,4 +1,4 @@
-# EPIC-001 — Account Creation
+# EPIC001 — Account Creation
 
 ## Objective
 
@@ -38,14 +38,23 @@ The system must:
 
 ### Successful Response
 
+`201 Created`
+
 ```json
 {
   "id": 1,
   "name": "John Doe",
   "balance": 1000.00,
-  "createdAt": "2026-08-31T11:00:00"
+  "createdAt": "2026-08-31T14:00:00Z"
 }
 ```
+
+### Temporary authentication scope
+
+`POST /api/v1/accounts` does not require an `Authorization` header in the
+current simplified scope. Bearer-token authentication remains required future
+work and is explicitly deferred by
+[ADR-0027](../adr/ADR-0027-defer-api-authentication-for-the-initial-scope.md).
 
 ---
 
@@ -62,7 +71,11 @@ The system must:
 - A successfully created account must be available for subsequent financial operations.
 - Invalid requests must not persist an account.
 - Monetary values must preserve their decimal precision.
+- Initial balances are normalized to two decimal places with `HALF_EVEN`
+  rounding as required by
+  [ADR-0022](../adr/ADR-0022-use-bigdecimal-with-half-even-rounding-for-monetary-values.md).
 - Account creation must follow the standardized API error contract for invalid requests.
+- Account creation succeeds without an authentication token in the current scope.
 - Account retrieval, listing, update, and deletion are outside the scope of this Epic.
 
 ---
