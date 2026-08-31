@@ -7,7 +7,7 @@ This is the single execution report for all epic execution plans.
 | Epic | Execution plan | Status | Latest checkpoint |
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
-| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | In progress | Core service and unit tests completed |
+| EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | In progress | HTTP contract and isolated tests completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Backlog | Workflow 01 not started |
 
 ## Completed foundation work
@@ -108,6 +108,10 @@ the real HTTP application and disposable PostgreSQL 17.6 without mocks,
 including successful persistence, unique IDs, monetary round trips, timestamps,
 and invalid-request atomicity. These are local disposable boundaries, so no
 consequential Workflow 05 authorization gate applies.
+
+At the latest checkpoint, the persistence/use-case slice and HTTP/security
+slice are complete. `./mvnw -B -ntp clean verify` passed 17 unit tests and 7
+isolated MVC scenarios, including the 90% eligible-code line-coverage gate.
 
 ## Source control
 

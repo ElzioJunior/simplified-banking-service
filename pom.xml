@@ -193,6 +193,9 @@
                             <excludes>
                                 <exclude>**/*Application.class</exclude>
                                 <exclude>**/account/model/Account.class</exclude>
+                                <exclude>**/account/api/CreateAccountRequest.class</exclude>
+                                <exclude>**/account/api/AccountResponse.class</exclude>
+                                <exclude>**/configuration/SecurityConfiguration.class</exclude>
                                 <exclude>**/configuration/TimeConfiguration.class</exclude>
                             </excludes>
                         </configuration>
