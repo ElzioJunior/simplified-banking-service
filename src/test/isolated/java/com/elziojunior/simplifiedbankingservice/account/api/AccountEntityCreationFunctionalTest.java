@@ -28,12 +28,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapperImpl;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfiguration;
 
 @WebMvcTest(AccountController.class)
-@Import({ApiExceptionHandler.class, SecurityConfiguration.class})
+@Import({ApiExceptionHandler.class, SecurityConfiguration.class, AccountMapperImpl.class})
 class AccountEntityCreationFunctionalTest {
 
     @Autowired

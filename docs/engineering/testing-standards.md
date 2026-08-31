@@ -24,6 +24,22 @@ Default conventions:
 Shared test utilities must not use a test-suite suffix. Do not keep Java tests
 in a legacy source tree once the project adopts the separated layout.
 
+## Functional-test database safety
+
+- Isolated and integrated functional tests must never connect to the
+  application's transactional database or any shared database.
+- Persistence tests must provision a disposable, test-owned database such as a
+  PostgreSQL Testcontainer and fail before each scenario unless the resolved
+  datasource is proven to be that exact running test instance.
+- Functional tests must not clear or reset database tables through
+  `TRUNCATE`, bulk `DELETE`, Flyway clean, schema drops, repository-wide delete
+  operations, or equivalent cleanup. Create uniquely identifiable fixtures,
+  scope assertions to those fixtures, and discard the whole disposable
+  database after the suite.
+- A fixture-scoped mutation that exists to verify a database constraint is
+  permitted when the test asserts its expected outcome and cannot affect rows
+  outside that fixture.
+
 ## Unit tests
 
 - Unit tests remain process-local: do not start Spring, open network sockets,
@@ -78,7 +94,8 @@ always opt-in. They supplement rather than replace isolated functional tests.
   selection. Never commit or print secrets.
 - Perform actionable preflights and fail clearly when an explicitly requested
   runtime is unavailable.
-- Make scenarios independent, seed only minimal data, and clean created state.
+- Make scenarios independent, seed only minimal uniquely identifiable data,
+  and scope observations to the scenario fixtures.
 - Do not accept an HTTP acknowledgement or queue publication as sufficient when
   the scenario promises an observable downstream business result.
 - Document the exact command and authorization boundary in the feature plan.

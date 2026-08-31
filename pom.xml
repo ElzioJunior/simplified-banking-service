@@ -23,6 +23,7 @@
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <gatling.version>3.15.1</gatling.version>
         <gatling-maven-plugin.version>4.21.10</gatling-maven-plugin.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
         <surefireArgLine></surefireArgLine>
     </properties>
 
@@ -63,6 +64,11 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mapstruct</groupId>
+            <artifactId>mapstruct</artifactId>
+            <version>${mapstruct.version}</version>
         </dependency>
 
         <dependency>
@@ -117,6 +123,19 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${mapstruct.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -202,8 +221,7 @@
                                 <exclude>**/model/entity/*.class</exclude>
                                 <exclude>**/model/api/*.class</exclude>
                                 <exclude>**/model/dto/*.class</exclude>
-                                <exclude>**/api/Create*Request.class</exclude>
-                                <exclude>**/service/*Command.class</exclude>
+                                <exclude>**/model/mapper/*Impl.class</exclude>
                                 <exclude>**/configuration/SecurityConfiguration.class</exclude>
                                 <exclude>**/configuration/TimeConfiguration.class</exclude>
                             </excludes>

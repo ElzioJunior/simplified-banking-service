@@ -30,13 +30,18 @@ deterministic default quality gates.
    configured integrated naming convention. Never mix them into unit or
    isolated functional source sets.
 5. Define each scenario with actor/input, minimal fixtures, stable expected
-   result, observable side effects, cleanup, and deterministic safety checks.
+   result, observable side effects, resource lifecycle, and deterministic
+   safety checks.
 6. Enter through the real public/application boundary named by the scenario;
    do not call an internal service merely to bypass transport or security.
 7. Use production implementations for every boundary explicitly under test.
    Do not mock the behavior whose integration is being qualified.
 8. Use isolated, ephemeral infrastructure when practical and apply real schema
    migrations when persistence is part of the path.
+   - Never connect functional tests to a transactional or shared database.
+   - Prove the resolved datasource is the test-owned disposable instance.
+   - Never clear database tables for isolation; use unique fixtures,
+     fixture-scoped assertions, and whole-instance disposal.
 9. Add test-only observation that exposes the final application outcome without
    adding an unsafe production endpoint or changing product behavior.
 10. Assert stable contracts and domain invariants rather than incidental
@@ -58,7 +63,7 @@ Planning mode returns:
 
 - Scenario matrix.
 - Boundary/topology map.
-- Fixtures, cleanup, and expected results.
+- Fixtures, resource lifecycle, and expected results.
 - Test naming and opt-in execution mechanism.
 - Observability requirements.
 - Prerequisites, risks, failure diagnostics, and open decisions.
@@ -75,7 +80,8 @@ command results.
   unavailable; it is not silently skipped.
 - Default unit and isolated functional quality gates require no real provider.
 - Secrets remain outside version control and are never printed.
-- Cleanup prevents avoidable external or shared-state residue.
+- Disposable database instances are discarded without clearing their tables;
+  other cleanup prevents avoidable external or shared-state residue.
 - Assertions prove stable application behavior, not only transport acceptance.
 
 ## Stop conditions

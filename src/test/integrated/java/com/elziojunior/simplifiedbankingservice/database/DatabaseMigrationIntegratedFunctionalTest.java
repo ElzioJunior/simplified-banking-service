@@ -8,6 +8,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import javax.sql.DataSource;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -35,16 +39,13 @@ class DatabaseMigrationIntegratedFunctionalTest {
     @Autowired
     private Flyway flyway;
 
-    /**
-     * Clears mutable schema state before each scenario so every constraint test
-     * proves its behavior independently against the same migrated database.
-     */
+    @Autowired
+    private DataSource dataSource;
+
+    /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach
-    void resetSchemaData() {
-        jdbcTemplate.execute("""
-                TRUNCATE TABLE transfer_notification_outbox, transfer_idempotency_tokens,
-                    movements, accounts RESTART IDENTITY
-                """);
+    void verifyEphemeralDatabase() {
+        EphemeralPostgresGuard.verify(dataSource, POSTGRESQL);
     }
 
     /**

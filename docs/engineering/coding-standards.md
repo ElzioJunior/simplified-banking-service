@@ -39,6 +39,7 @@ Typical packages/layers:
 - `model.api` — HTTP request and response models; prefer Java records.
 - `model.dto` — application/service input and output DTOs; prefer Java records.
 - `model.entity` — persistence entities and persistence-owned enums.
+- `model.mapper` — MapStruct mappings between API models and application DTOs.
 - `exception` — application-specific exception types shared across layers.
 - `service` — application orchestration and business behavior.
 - `repository` — persistence access.
@@ -71,6 +72,9 @@ Dependencies should generally flow from API/integration boundaries toward applic
   input types; represent those inputs as purpose-specific DTOs instead.
 - Event and notification records may retain purpose-specific event names when
   they are not service input or output DTOs.
+- Keep API-model-to-DTO and DTO-to-API-model construction out of controllers.
+  Define use-case-specific MapStruct interfaces under `model.mapper`, generate
+  them as Spring components, and fail compilation for unmapped target fields.
 - Do not reuse one generic DTO across unrelated use cases merely to reduce class count.
 - Do not expose persistence entities as DTOs.
 

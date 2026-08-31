@@ -35,7 +35,8 @@ build lifecycle.
 ## Preparation output
 
 - Scenario matrix and stable expected outcomes.
-- Fixtures, isolation, cleanup, and observability strategy.
+- Fixtures, database isolation and disposal, non-database cleanup, and
+  observability strategy.
 - Configuration and preflight requirements.
 - Dedicated command/profile and proof that default quality gates remain
   provider-independent.

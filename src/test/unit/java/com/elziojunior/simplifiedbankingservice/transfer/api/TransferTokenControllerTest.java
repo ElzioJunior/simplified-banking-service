@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import com.elziojunior.simplifiedbankingservice.api.TransferTokenController;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapper;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
 
 class TransferTokenControllerTest {
@@ -21,13 +22,18 @@ class TransferTokenControllerTest {
     @Test
     void shouldMapIssuedToken() {
         IssueTransferTokenService service = mock(IssueTransferTokenService.class);
+        TransferTokenMapper mapper = mock(TransferTokenMapper.class);
         UUID token = UUID.fromString("00000000-0000-0000-0000-000000000001");
         OffsetDateTime expiresAt = OffsetDateTime.parse("2026-08-31T14:10:00Z");
-        when(service.issue()).thenReturn(new IssuedTransferTokenDto(token, expiresAt));
+        IssuedTransferTokenDto issued = new IssuedTransferTokenDto(token, expiresAt);
+        TransferTokenResponse expected = new TransferTokenResponse(token, expiresAt);
+        when(service.issue()).thenReturn(issued);
+        when(mapper.toResponse(issued)).thenReturn(expected);
 
-        TransferTokenResponse response = new TransferTokenController(service).issue();
+        TransferTokenResponse response = new TransferTokenController(service, mapper).issue();
 
-        assertThat(response).isEqualTo(new TransferTokenResponse(token, expiresAt));
+        assertThat(response).isEqualTo(expected);
         verify(service).issue();
+        verify(mapper).toResponse(issued);
     }
 }

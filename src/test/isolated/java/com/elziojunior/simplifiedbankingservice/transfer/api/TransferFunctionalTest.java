@@ -30,6 +30,8 @@ import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfigurat
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapperImpl;
+import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapperImpl;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
@@ -39,7 +41,12 @@ import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
 import java.util.function.Supplier;
 
 @WebMvcTest({TransferTokenController.class, TransferController.class})
-@Import({ApiExceptionHandler.class, SecurityConfiguration.class})
+@Import({
+        ApiExceptionHandler.class,
+        SecurityConfiguration.class,
+        TransferMapperImpl.class,
+        TransferTokenMapperImpl.class
+})
 class TransferFunctionalTest {
 
     private static final UUID TOKEN = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -78,8 +85,8 @@ class TransferFunctionalTest {
     /** Proves transfer execution maps the public header, body, and completed response. */
     @Test
     void shouldCreateTransferWithoutAuthenticationOrCsrf() throws Exception {
-        CreateTransferDto command = new CreateTransferDto(TOKEN, 1L, 2L, new BigDecimal("12.345"));
-        when(createTransferService.create(command)).thenReturn(
+        CreateTransferDto input = new CreateTransferDto(TOKEN, 1L, 2L, new BigDecimal("12.345"));
+        when(createTransferService.create(input)).thenReturn(
                 new CompletedTransferDto(TRANSFER_ID, 1L, 2L, new BigDecimal("12.34")));
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -95,7 +102,7 @@ class TransferFunctionalTest {
                 .andExpect(jsonPath("$.destinationAccountId").value(2))
                 .andExpect(jsonPath("$.amount").value(12.34));
 
-        verify(createTransferService).create(command);
+        verify(createTransferService).create(input);
     }
 
     /** Proves missing and malformed idempotency headers receive safe failures. */

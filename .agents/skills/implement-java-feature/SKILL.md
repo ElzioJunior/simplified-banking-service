@@ -29,7 +29,7 @@ Implement production Java/Spring behavior according to an approved plan.
    active ADRs and engineering standards.
 8. Before adding or moving Java types, apply the package and type-naming rules
    in `../../../docs/engineering/coding-standards.md`, including its API model,
-   DTO, entity, exception, and configuration boundaries.
+   DTO, mapper, entity, exception, and configuration boundaries.
 9. Keep changes scoped and reviewable.
 10. Remove dead/debug/speculative code before completion.
 11. Optimize first for human-readable names, responsibilities, and control

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapper;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
 
 /** HTTP adapter for server-issued transfer idempotency tokens. */
@@ -16,9 +17,13 @@ import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenServic
 public class TransferTokenController {
 
     private final IssueTransferTokenService issueTransferTokenService;
+    private final TransferTokenMapper transferTokenMapper;
 
-    public TransferTokenController(IssueTransferTokenService issueTransferTokenService) {
+    public TransferTokenController(
+            IssueTransferTokenService issueTransferTokenService,
+            TransferTokenMapper transferTokenMapper) {
         this.issueTransferTokenService = issueTransferTokenService;
+        this.transferTokenMapper = transferTokenMapper;
     }
 
     /** Issues the prerequisite token so a later transfer can be retried safely. */
@@ -26,6 +31,6 @@ public class TransferTokenController {
     @ResponseStatus(HttpStatus.CREATED)
     public TransferTokenResponse issue() {
         IssuedTransferTokenDto issued = issueTransferTokenService.issue();
-        return new TransferTokenResponse(issued.token(), issued.expiresAt());
+        return transferTokenMapper.toResponse(issued);
     }
 }

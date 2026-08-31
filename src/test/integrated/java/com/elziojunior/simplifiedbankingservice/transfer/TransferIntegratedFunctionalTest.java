@@ -47,6 +47,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
 import com.elziojunior.simplifiedbankingservice.service.TransferNotificationOutboxPublisher;
+import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 import javax.sql.DataSource;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -87,16 +88,10 @@ class TransferIntegratedFunctionalTest {
     @Autowired
     private MeterRegistry meterRegistry;
 
-    /** Clears all owned persistence and broker state before each real-boundary scenario. */
+    /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach
-    void resetState() {
-        jdbcTemplate.execute("""
-                TRUNCATE TABLE transfer_notification_outbox, transfer_idempotency_tokens,
-                    movements, accounts RESTART IDENTITY
-                """);
-        while (rabbitTemplate.receive(TransferNotificationConfiguration.QUEUE) != null) {
-            // Drain messages from the prior isolated scenario.
-        }
+    void verifyEphemeralDatabase() {
+        EphemeralPostgresGuard.verify(dataSource, POSTGRESQL);
     }
 
     /** Proves the real HTTP/PostgreSQL/RabbitMQ success path and all atomic financial effects. */
@@ -114,8 +109,8 @@ class TransferIntegratedFunctionalTest {
         assertThat(body.amount()).isEqualByComparingTo("12.34");
         assertThat(balance(source)).isEqualByComparingTo("87.66");
         assertThat(balance(destination)).isEqualByComparingTo("22.34");
-        assertThat(count("movements")).isEqualTo(2);
-        assertThat(count("transfer_notification_outbox")).isOne();
+        assertThat(movementCount(body.transferId())).isEqualTo(2);
+        assertThat(outboxCount(body.transferId())).isOne();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM transfer_idempotency_tokens WHERE token = ? AND used_at IS NOT NULL",
                 Integer.class, token)).isOne();
@@ -123,10 +118,8 @@ class TransferIntegratedFunctionalTest {
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
                 "SELECT published_at FROM transfer_notification_outbox WHERE operation_id = ?",
                 OffsetDateTime.class, body.transferId())).isNotNull());
-        Object received = await().atMost(Duration.ofSeconds(5)).until(() ->
-                rabbitTemplate.receiveAndConvert(TransferNotificationConfiguration.QUEUE), value -> value != null);
-        assertThat(received).isInstanceOf(TransferCompletedNotification.class);
-        TransferCompletedNotification event = (TransferCompletedNotification) received;
+        TransferCompletedNotification event = await().atMost(Duration.ofSeconds(5)).until(
+                () -> receiveNotification(body.transferId()), value -> value != null);
         assertThat(event.operationId()).isEqualTo(body.transferId());
         assertThat(event.recipientAccountId()).isEqualTo(source);
         assertThat(event.amount()).isEqualByComparingTo("12.34");
@@ -148,8 +141,8 @@ class TransferIntegratedFunctionalTest {
         assertThat(mismatch.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(balance(source)).isEqualByComparingTo("75.00");
         assertThat(balance(destination)).isEqualByComparingTo("25.00");
-        assertThat(count("movements")).isEqualTo(2);
-        assertThat(count("transfer_notification_outbox")).isOne();
+        assertThat(movementCount(first.transferId())).isEqualTo(2);
+        assertThat(outboxCount(first.transferId())).isOne();
     }
 
     /** Proves invalid token, account, balance, and same-account cases leave no financial history. */
@@ -178,8 +171,9 @@ class TransferIntegratedFunctionalTest {
 
         assertThat(balance(source)).isEqualByComparingTo("10.00");
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
-        assertThat(count("movements")).isZero();
-        assertThat(count("transfer_notification_outbox")).isZero();
+        assertThat(movementCountForAccount(source)).isZero();
+        assertThat(movementCountForAccount(destination)).isZero();
+        assertThat(outboxCountForRecipient(source)).isZero();
     }
 
     /** Proves competing debits serialize without overdraft and conserve total money. */
@@ -204,10 +198,12 @@ class TransferIntegratedFunctionalTest {
         assertThat(statuses).filteredOn(status -> status == HttpStatus.OK.value()).hasSize(50);
         assertThat(statuses).filteredOn(status -> status == HttpStatus.CONFLICT.value()).hasSize(50);
         assertThat(balance(source)).isEqualByComparingTo("0.00");
-        BigDecimal total = jdbcTemplate.queryForObject("SELECT sum(balance) FROM accounts", BigDecimal.class);
-        assertThat(total).isEqualByComparingTo("50.00");
-        assertThat(count("movements")).isEqualTo(100);
-        assertThat(count("transfer_notification_outbox")).isEqualTo(50);
+        BigDecimal destinationTotal = destinations.stream()
+                .map(this::balance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(balance(source).add(destinationTotal)).isEqualByComparingTo("50.00");
+        assertThat(movementCountForAccount(source)).isEqualTo(50);
+        assertThat(outboxCountForRecipient(source)).isEqualTo(50);
         assertThat(destinations).hasSize(100);
     }
 
@@ -233,7 +229,9 @@ class TransferIntegratedFunctionalTest {
                 });
                 assertThat(publisherStarted.await(1, TimeUnit.SECONDS)).isTrue();
                 assertThat(jdbcTemplate.queryForObject(
-                        "SELECT published_at FROM transfer_notification_outbox", OffsetDateTime.class)).isNull();
+                        "SELECT published_at FROM transfer_notification_outbox WHERE recipient_account_id = ?",
+                        OffsetDateTime.class,
+                        source)).isNull();
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException(exception);
@@ -248,9 +246,12 @@ class TransferIntegratedFunctionalTest {
         }
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
-                "SELECT published_at FROM transfer_notification_outbox", OffsetDateTime.class)).isNotNull());
-        assertThat(count("transfer_notification_outbox")).isOne();
-        assertThat(count("movements")).isEqualTo(2);
+                "SELECT published_at FROM transfer_notification_outbox WHERE recipient_account_id = ?",
+                OffsetDateTime.class,
+                source)).isNotNull());
+        assertThat(outboxCountForRecipient(source)).isOne();
+        assertThat(movementCountForAccount(source)).isOne();
+        assertThat(movementCountForAccount(destination)).isOne();
     }
 
     /** Proves a contended account fails within the configured bound and rolls back token use. */
@@ -275,8 +276,9 @@ class TransferIntegratedFunctionalTest {
             assertThat(jdbcTemplate.queryForObject(
                     "SELECT used_at FROM transfer_idempotency_tokens WHERE token = ?",
                     OffsetDateTime.class, token)).isNull();
-            assertThat(count("movements")).isZero();
-            assertThat(count("transfer_notification_outbox")).isZero();
+            assertThat(movementCountForAccount(source)).isZero();
+            assertThat(movementCountForAccount(destination)).isZero();
+            assertThat(outboxCountForRecipient(source)).isZero();
             assertThat(meterRegistry.counter("banking.transfer.lock.contention").count()).isPositive();
             assertThat(meterRegistry.counter("banking.transfer.timeouts").count()).isPositive();
             connection.rollback();
@@ -307,8 +309,9 @@ class TransferIntegratedFunctionalTest {
 
         assertThat(balance(source)).isEqualByComparingTo("10.00");
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
-        assertThat(count("movements")).isZero();
-        assertThat(count("transfer_notification_outbox")).isZero();
+        assertThat(movementCountForAccount(source)).isZero();
+        assertThat(movementCountForAccount(destination)).isZero();
+        assertThat(outboxCountForRecipient(source)).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT used_at FROM transfer_idempotency_tokens WHERE token = ?",
                 OffsetDateTime.class, token)).isNull();
@@ -337,8 +340,10 @@ class TransferIntegratedFunctionalTest {
 
         assertThat(balance(first)).isEqualByComparingTo("20.00");
         assertThat(balance(second)).isEqualByComparingTo("20.00");
-        assertThat(count("movements")).isEqualTo(4);
-        assertThat(count("transfer_notification_outbox")).isEqualTo(2);
+        assertThat(movementCountForAccount(first)).isEqualTo(2);
+        assertThat(movementCountForAccount(second)).isEqualTo(2);
+        assertThat(outboxCountForRecipient(first)).isOne();
+        assertThat(outboxCountForRecipient(second)).isOne();
     }
 
     private Callable<Integer> coordinatedTransfer(
@@ -389,10 +394,43 @@ class TransferIntegratedFunctionalTest {
         return jdbcTemplate.queryForObject("SELECT balance FROM accounts WHERE id = ?", BigDecimal.class, accountId);
     }
 
-    private int count(String table) {
-        if (!List.of("movements", "transfer_notification_outbox").contains(table)) {
-            throw new IllegalArgumentException("Unexpected table");
+    private int movementCount(UUID operationId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM movements WHERE operation_id = ?",
+                Integer.class,
+                operationId);
+    }
+
+    private int movementCountForAccount(long accountId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM movements WHERE account_id = ?",
+                Integer.class,
+                accountId);
+    }
+
+    private int outboxCount(UUID operationId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM transfer_notification_outbox WHERE operation_id = ?",
+                Integer.class,
+                operationId);
+    }
+
+    private int outboxCountForRecipient(long accountId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM transfer_notification_outbox WHERE recipient_account_id = ?",
+                Integer.class,
+                accountId);
+    }
+
+    /** Consumes queued test notifications until it finds the event owned by the current fixture. */
+    private TransferCompletedNotification receiveNotification(UUID operationId) {
+        Object received;
+        while ((received = rabbitTemplate.receiveAndConvert(TransferNotificationConfiguration.QUEUE)) != null) {
+            if (received instanceof TransferCompletedNotification notification
+                    && notification.operationId().equals(operationId)) {
+                return notification;
+            }
         }
-        return jdbcTemplate.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+        return null;
     }
 }

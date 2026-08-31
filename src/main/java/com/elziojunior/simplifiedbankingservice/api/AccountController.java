@@ -2,16 +2,15 @@ package com.elziojunior.simplifiedbankingservice.api;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapper;
+import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
-import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 
 import jakarta.validation.Valid;
 
@@ -21,9 +20,11 @@ import jakarta.validation.Valid;
 public class AccountController {
 
     private final CreateAccountService createAccountService;
+    private final AccountMapper accountMapper;
 
-    public AccountController(CreateAccountService createAccountService) {
+    public AccountController(CreateAccountService createAccountService, AccountMapper accountMapper) {
         this.createAccountService = createAccountService;
+        this.accountMapper = accountMapper;
     }
 
     /**
@@ -36,12 +37,7 @@ public class AccountController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AccountResponse create(@Valid @RequestBody CreateAccountRequest request) {
-        CreatedAccountDto account = createAccountService.create(
-                new CreateAccountDto(request.name(), request.initialBalance()));
-        return new AccountResponse(
-                account.id(),
-                account.name(),
-                account.balance(),
-                account.createdAt());
+        CreatedAccountDto account = createAccountService.create(accountMapper.toDto(request));
+        return accountMapper.toResponse(account);
     }
 }

@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
-import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
 
@@ -24,15 +24,19 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/transfers")
 public class TransferController {
 
-    private static final String COMPLETED = "COMPLETED";
     private static final Logger LOGGER = LoggerFactory.getLogger(TransferController.class);
 
     private final CreateTransferService createTransferService;
     private final TransferMetrics transferMetrics;
+    private final TransferMapper transferMapper;
 
-    public TransferController(CreateTransferService createTransferService, TransferMetrics transferMetrics) {
+    public TransferController(
+            CreateTransferService createTransferService,
+            TransferMetrics transferMetrics,
+            TransferMapper transferMapper) {
         this.createTransferService = createTransferService;
         this.transferMetrics = transferMetrics;
+        this.transferMapper = transferMapper;
     }
 
     /** Executes or replays one transfer while keeping HTTP concerns outside financial behavior. */
@@ -41,14 +45,8 @@ public class TransferController {
             @RequestHeader("Idempotency-Key") UUID token,
             @Valid @RequestBody CreateTransferRequest request) {
         CompletedTransferDto transfer = transferMetrics.observe(() -> createTransferService.create(
-                new CreateTransferDto(
-                        token, request.sourceAccountId(), request.destinationAccountId(), request.amount())));
+                transferMapper.toDto(token, request)));
         LOGGER.info("Transfer request completed with operationId={}", transfer.transferId());
-        return new TransferResponse(
-                transfer.transferId(),
-                COMPLETED,
-                transfer.sourceAccountId(),
-                transfer.destinationAccountId(),
-                transfer.amount());
+        return transferMapper.toResponse(transfer);
     }
 }
