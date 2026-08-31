@@ -185,10 +185,10 @@ class TransferIntegratedFunctionalTest {
     /** Proves competing debits serialize without overdraft and conserve total money. */
     @Test
     void shouldSerializeCompetingDebitsAndConserveMoney() throws Exception {
-        long source = createAccount("Hot source", "10.00");
+        long source = createAccount("Hot source", "50.00");
         List<Long> destinations = new ArrayList<>();
         List<Callable<Integer>> requests = new ArrayList<>();
-        for (int index = 0; index < 20; index++) {
+        for (int index = 0; index < 100; index++) {
             long destination = createAccount("Destination " + index, "0.00");
             destinations.add(destination);
             UUID token = issueToken();
@@ -201,14 +201,14 @@ class TransferIntegratedFunctionalTest {
             statuses = futures.stream().map(this::result).toList();
         }
 
-        assertThat(statuses).filteredOn(status -> status == HttpStatus.OK.value()).hasSize(10);
-        assertThat(statuses).filteredOn(status -> status == HttpStatus.CONFLICT.value()).hasSize(10);
+        assertThat(statuses).filteredOn(status -> status == HttpStatus.OK.value()).hasSize(50);
+        assertThat(statuses).filteredOn(status -> status == HttpStatus.CONFLICT.value()).hasSize(50);
         assertThat(balance(source)).isEqualByComparingTo("0.00");
         BigDecimal total = jdbcTemplate.queryForObject("SELECT sum(balance) FROM accounts", BigDecimal.class);
-        assertThat(total).isEqualByComparingTo("10.00");
-        assertThat(count("movements")).isEqualTo(20);
-        assertThat(count("transfer_notification_outbox")).isEqualTo(10);
-        assertThat(destinations).hasSize(20);
+        assertThat(total).isEqualByComparingTo("50.00");
+        assertThat(count("movements")).isEqualTo(100);
+        assertThat(count("transfer_notification_outbox")).isEqualTo(50);
+        assertThat(destinations).hasSize(100);
     }
 
     /** Proves broker outage cannot roll back money and pending intent publishes after recovery. */
@@ -283,6 +283,73 @@ class TransferIntegratedFunctionalTest {
         }
         assertThat(balance(source)).isEqualByComparingTo("10.00");
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
+    }
+
+    /** Proves a late outbox persistence failure rolls back balances, movements, and token association together. */
+    @Test
+    void shouldRollbackEveryEffectWhenLatePersistenceFails() {
+        long source = createAccount("Source", "10.00");
+        long destination = createAccount("Destination", "0.00");
+        UUID token = issueToken();
+        jdbcTemplate.execute("""
+                ALTER TABLE transfer_notification_outbox
+                ADD CONSTRAINT test_reject_outbox_insert CHECK (false)
+                """);
+        try {
+            assertThat(transfer(token, source, destination, "3.00").getStatusCode())
+                    .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        } finally {
+            jdbcTemplate.execute("""
+                    ALTER TABLE transfer_notification_outbox
+                    DROP CONSTRAINT test_reject_outbox_insert
+                    """);
+        }
+
+        assertThat(balance(source)).isEqualByComparingTo("10.00");
+        assertThat(balance(destination)).isEqualByComparingTo("0.00");
+        assertThat(count("movements")).isZero();
+        assertThat(count("transfer_notification_outbox")).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT used_at FROM transfer_idempotency_tokens WHERE token = ?",
+                OffsetDateTime.class, token)).isNull();
+    }
+
+    /** Proves opposite-direction transfers share ascending lock order and complete without deadlock. */
+    @Test
+    void shouldCompleteSimultaneousCrossTransfers() throws Exception {
+        long first = createAccount("First", "20.00");
+        long second = createAccount("Second", "20.00");
+        UUID firstToken = issueToken();
+        UUID secondToken = issueToken();
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<Integer> forward = coordinatedTransfer(ready, start, firstToken, first, second);
+        Callable<Integer> backward = coordinatedTransfer(ready, start, secondToken, second, first);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> firstResult = executor.submit(forward);
+            Future<Integer> secondResult = executor.submit(backward);
+            assertThat(ready.await(2, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(firstResult.get(3, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK.value());
+            assertThat(secondResult.get(3, TimeUnit.SECONDS)).isEqualTo(HttpStatus.OK.value());
+        }
+
+        assertThat(balance(first)).isEqualByComparingTo("20.00");
+        assertThat(balance(second)).isEqualByComparingTo("20.00");
+        assertThat(count("movements")).isEqualTo(4);
+        assertThat(count("transfer_notification_outbox")).isEqualTo(2);
+    }
+
+    private Callable<Integer> coordinatedTransfer(
+            CountDownLatch ready, CountDownLatch start, UUID token, long source, long destination) {
+        return () -> {
+            ready.countDown();
+            if (!start.await(2, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Cross-transfer start barrier timed out");
+            }
+            return transfer(token, source, destination, "5.00").getStatusCode().value();
+        };
     }
 
     private int result(Future<Integer> future) {
