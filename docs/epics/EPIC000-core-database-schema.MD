@@ -51,19 +51,19 @@ migration and database-enforced structural invariants.
 
 ## Requirements and acceptance criteria
 
-- [ ] Flyway initializes an empty PostgreSQL database from one versioned migration.
-- [ ] `accounts.id` and `movements.id` are generated `BIGINT` identity primary keys.
-- [ ] Account names are required, limited to 255 characters, and cannot be blank.
-- [ ] Account balances are required `NUMERIC(19,2)` values greater than or equal to zero.
-- [ ] Movement amounts are required `NUMERIC(19,2)` values greater than zero.
-- [ ] Movement types are restricted to `CREDIT` and `DEBIT`.
-- [ ] Every movement references an existing account and account deletion does not cascade to movements.
-- [ ] Operation identifiers are required UUID values and support efficient correlation queries.
-- [ ] An operation cannot contain duplicate movements of the same type.
-- [ ] Account/date and account/type/date query paths have supporting indexes.
-- [ ] Both tables require unambiguous timestamp-with-time-zone values.
-- [ ] Re-running Flyway against the migrated database is idempotent.
-- [ ] No feature code, seed data, idempotency-token table, notification table, or outbox table is introduced.
+- [x] Flyway initializes an empty PostgreSQL database from one versioned migration.
+- [x] `accounts.id` and `movements.id` are generated `BIGINT` identity primary keys.
+- [x] Account names are required, limited to 255 characters, and cannot be blank.
+- [x] Account balances are required `NUMERIC(19,2)` values greater than or equal to zero.
+- [x] Movement amounts are required `NUMERIC(19,2)` values greater than zero.
+- [x] Movement types are restricted to `CREDIT` and `DEBIT`.
+- [x] Every movement references an existing account and account deletion does not cascade to movements.
+- [x] Operation identifiers are required UUID values and support efficient correlation queries.
+- [x] An operation cannot contain duplicate movements of the same type.
+- [x] Account/date and account/type/date query paths have supporting indexes.
+- [x] Both tables require unambiguous timestamp-with-time-zone values.
+- [x] Re-running Flyway against the migrated database is idempotent.
+- [x] No feature code, seed data, idempotency-token table, notification table, or outbox table is introduced.
 
 ## Risks and failure behavior
 

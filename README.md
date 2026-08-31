@@ -5,11 +5,11 @@ small digital-banking domain. Its documented scope covers account creation and
 safe account-to-account transfers, with financial consistency and traceability
 as primary constraints.
 
-The repository is currently documentation-first: the product behavior,
-business rules, architecture choices, engineering standards, and AI-assisted
-delivery workflows were defined before application implementation began. The
-application foundation is now available; account and transfer features remain
-planned rather than implemented.
+The repository began documentation-first: product behavior, business rules,
+architecture choices, engineering standards, and AI-assisted delivery
+workflows were defined before implementation. The application foundation and
+the initial Account/Movement database schema are now available; account and
+transfer application features remain planned rather than implemented.
 
 ## Current scope
 
@@ -58,8 +58,7 @@ Content-Type: application/json
 }
 ```
 
-The API contracts above describe the planned behavior. No application build is
-present in the repository yet.
+The API contracts above describe planned behavior and are not implemented yet.
 
 ## Architecture baseline
 
@@ -83,6 +82,8 @@ status is visible in the source documents under `docs/`.
 ## Documentation
 
 - [Documentation map](docs/README.md)
+- [Core database schema epic](docs/epics/EPIC000-core-database-schema.MD)
+- [Development execution report](docs/epics/execution-report.md)
 - [Account creation epic](docs/epics/EPIC001-account-creation.MD)
 - [Account-to-account transfer epic](docs/epics/EPIC002-account-to-account-transfer.MD)
 - [Business decision records](docs/bdr/README.md)
@@ -112,7 +113,7 @@ host Maven installation is not required.
 
 Unit tests belong under `src/test/unit/java`. Isolated functional tests belong
 under `src/test/isolated/java` and join the normal `verify` lifecycle. The
-real-boundary integrated source set is opt-in:
+integrated source set is opt-in and uses disposable PostgreSQL infrastructure:
 
 ```bash
 ./mvnw -Pintegrated-functional-tests verify
@@ -162,8 +163,9 @@ settings through the same environment variables used for local execution.
 ## Development status
 
 The bootable application foundation, dependency management, separated test
-source sets, and local infrastructure are implemented. No account, transfer,
-movement, notification, or database-migration feature has been implemented.
+source sets, local infrastructure, and Flyway V1 Account/Movement schema are
+implemented. Account, transfer, movement-query, and notification application
+features remain unimplemented.
 
 The canonical validation command is:
 

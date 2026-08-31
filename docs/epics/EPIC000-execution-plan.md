@@ -43,14 +43,14 @@ or consequential external system are involved.
 
 ## Checkpoint
 
-- Status: in progress
-- Completed slices: 1 and 2
+- Status: complete
+- Completed slices: 1, 2, and 3
 - Validation evidence:
-  - `./mvnw -B -ntp clean verify` — passed
-  - `./mvnw -B -ntp test` — passed without Docker
-  - `./mvnw -B -ntp verify` — passed without Docker
-  - `./mvnw -B -ntp -Pintegrated-functional-tests verify` — 6 tests passed against disposable PostgreSQL 17.6
+  - `./mvnw -B -ntp clean test` — passed without Docker
+  - `./mvnw -B -ntp clean verify` — passed without Docker
+  - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 6 tests passed against disposable PostgreSQL 17.6
   - `docker compose config --quiet` — passed
   - Clean PostgreSQL 17.6 application startup — V1 applied successfully
   - Schema inspection — `accounts`, `movements`, Flyway history, and expected indexes present
-- Next action: run final quality gates, review, and documentation synchronization
+  - Independent review — no unresolved BLOCKER or HIGH finding
+- Next action: none; EPIC000 is complete
