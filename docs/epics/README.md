@@ -1,17 +1,27 @@
-# Feature Delivery Artifacts
+# Epic Delivery Artifacts
 
-Store feature/epic scope, execution plans, and concise execution reports here.
-Use a stable project-defined identifier such as `EP001` or `FEATURE-123`.
+Store epic scope, execution plans, and the repository-wide execution report
+here. Epic identifiers use the zero-padded `EPICxxx` convention.
 
-- `<ID>-feature.md` — outcome, scope, requirements, and acceptance criteria.
-- `<ID>-execution-plan.md` — ordered implementation slices and validation.
-- `<ID>-execution-report.md` — concise authorization summary and checkpoints.
+- `EPICxxx-<title>.MD` — outcome, scope, requirements, and acceptance criteria.
+- `EPICxxx-execution-plan.md` — the one ordered implementation plan belonging
+  to that epic.
+- `execution-report.md` — the single report covering every epic execution plan,
+  authorization state, validation evidence, and delivery checkpoint.
+
+Create an epic from [the epic template](epic-template.md), its plan from
+[the execution-plan template](execution-plan-template.md), and maintain the
+shared report using [the execution-report template](execution-report-template.md).
 
 These artifacts must link to governing product documents and decisions. They do
 not replace ADRs, BDRs, engineering standards, or the logical data model.
 
 ## Current artifacts
 
-- [FEATURE-001 — Project Foundation](FEATURE-001-project-foundation.md)
-- [FEATURE-001 — Execution Plan](FEATURE-001-execution-plan.md)
-- [FEATURE-001 — Development Execution Report](FEATURE-001-execution-report.md)
+- [EPIC000 — Core Database Schema](EPIC000-core-database-schema.MD)
+- [EPIC000 — Execution Plan](EPIC000-execution-plan.md)
+- [EPIC001 — Account Creation](EPIC001-account-creation.MD)
+- [EPIC001 — Execution Plan](EPIC001-execution-plan.md)
+- [EPIC002 — Account-to-Account Transfer](EPIC002-account-to-account-transfer.MD)
+- [EPIC002 — Execution Plan](EPIC002-execution-plan.md)
+- [Development Execution Report](execution-report.md)

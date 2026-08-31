@@ -52,11 +52,13 @@ An ordered implementation plan with:
   coding-standard baseline;
 - validation after each meaningful stage.
 
-Also produce `<ID>-execution-report.md` beside the feature/epic and execution plan.
-The report must be short enough for the user to approve the complete
-development scope without rereading the detailed backlog. It must end with one
-explicit request for development authorization and state that approval covers
-normal non-destructive commits and pushes until the integrated-test gate.
+Also update the single repository-wide `docs/epics/execution-report.md`; never
+create a per-epic execution report. The report must identify the active
+`EPICxxx-execution-plan.md`, retain concise status/checkpoints for other epic
+plans, and be short enough for the user to approve the active development scope
+without rereading its detailed backlog. It must end with one explicit request
+for development authorization and state that approval covers normal
+non-destructive commits and pushes until the integrated-test gate.
 
 ## Validation
 The plan must not silently introduce a new durable decision.

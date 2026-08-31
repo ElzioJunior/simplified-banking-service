@@ -97,11 +97,14 @@ Account balances and financial movements are considered sensitive financial data
 
 The physical database mapping must preserve the following intent:
 
-- `Account.id` must be the primary key of the account table.
-- `Movement.id` must be the primary key of the movement table.
-- `Movement.accountId` must reference `Account.id` through a foreign key.
-- `operationId` must be indexed to allow both sides of a financial operation to be retrieved efficiently.
-- Monetary values must use fixed-precision decimal storage and must not use floating-point types.
+- `Account.id` must map to a PostgreSQL `BIGINT` identity primary key.
+- `Movement.id` must map to a PostgreSQL `BIGINT` identity primary key.
+- `Movement.accountId` must reference `Account.id` through a non-cascading foreign key.
+- `operationId` must use PostgreSQL `UUID` and be indexed to allow both sides of a financial operation to be retrieved efficiently.
+- At most one `DEBIT` and one `CREDIT` Movement may exist for the same `operationId`; application behavior remains responsible for creating exactly one of each atomically.
+- Monetary values must use `NUMERIC(19,2)` storage and must not use floating-point types.
+- Audit timestamps must use `TIMESTAMPTZ` so persisted instants remain unambiguous across runtime time zones.
+- Account names must use `VARCHAR(255)` and reject null, empty, or whitespace-only values.
 - Account balance must be stored directly on the Account record.
 - Movement type must be constrained to the supported `CREDIT` and `DEBIT` values.
 - Foreign keys and indexes must support efficient account movement queries.
@@ -112,3 +115,4 @@ The physical database mapping must preserve the following intent:
 - The relationship from Movement to Account should be treated as lazy-loaded at the persistence layer unless a specific use case requires eager retrieval.
 - The Account entity does not need to expose or eagerly load its complete movement collection for normal account operations.
 - Database migrations must preserve these relationships, constraints, indexes, and financial invariants.
+- The initial physical schema contains only Account and Movement storage. Transfer idempotency-token persistence and notification/outbox persistence require their own feature scope and data-model update before a later migration introduces them.

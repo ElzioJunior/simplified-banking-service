@@ -15,13 +15,13 @@ Execute in order:
 - Context summary.
 - Decision-impact report.
 - Required documentation updates.
-- Feature or epic describing the approved product/technical scope when one does not
-  already exist.
+- Epic describing the approved product/technical scope when one does not already
+  exist, using the `EPICxxx` naming convention.
 - Ordered implementation plan.
-- Concise execution report, stored beside the epic as
-  `<ID>-execution-report.md`, covering what will change, ordered delivery
-  slices, material decisions and risks, validation/quality strategy, planned
-  integrated scope, and normal commit/push behavior.
+- The single repository-wide `docs/epics/execution-report.md`, updated with the
+  active epic plan, ordered delivery slices, material decisions and risks,
+  validation/quality strategy, planned integrated scope, authorization state,
+  and normal commit/push behavior. Never create a per-epic execution report.
 - One explicit request for authorization to execute the development plan.
 
 ## Stop conditions

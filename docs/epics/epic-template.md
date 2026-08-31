@@ -1,8 +1,8 @@
-# <ID> — <Feature title>
+# EPICxxx — <Epic title>
 
 ## Outcome
 
-<User or business outcome.>
+<User, business, or platform outcome.>
 
 ## Scope
 
