@@ -28,8 +28,8 @@ documentation in:
 - `docs/DECISIONS.md` — resolved and open decision register.
 - `docs/engineering/` — engineering standards and development practices.
 - `docs/database/` — logical data models, when data is involved.
-- `ai-operation/workflows/` — reusable feature-delivery workflows.
-- `ai-operation/skills/` — reusable capabilities invoked by workflows.
+- `.agents/workflows/` — reusable feature-delivery workflows.
+- `.agents/skills/` — open Agent Skills capabilities invoked by workflows.
 
 Read only the context relevant to the requested change, then expand when
 dependencies, uncertainty, or conflicts appear. Check related open decisions
@@ -71,7 +71,7 @@ model expresses intent; versioned migrations are the source of truth for the
 implemented physical schema. Do not silently alter the logical model as part of
 an unrelated feature.
 
-## AI operation
+## Agent workflows
 
 Workflows define when and in which order activities happen. Skills define how a
 reusable capability is performed. The default sequence is:

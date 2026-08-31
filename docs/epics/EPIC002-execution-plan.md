@@ -4,7 +4,7 @@
 
 This epic is in the backlog. Its implementation plan has not been prepared or
 authorized. Execute Workflow 01 against
-`EPIC002-account-to-account-transfer.MD` before replacing this placeholder with
+`EPIC002-account-to-account-transfer.md` before replacing this placeholder with
 ordered implementation slices.
 
 ## Preconditions and decisions
