@@ -8,7 +8,7 @@ This is the single execution report for all epic execution plans.
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
-| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | In progress | Flyway V2 and 7 real schema tests completed |
+| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Awaiting load authorization | Implementation, review, and local gates passed; Gatling prepared but not run |
 
 ## Completed foundation work
 
@@ -214,3 +214,52 @@ loops, documentation, and normal non-destructive commits and pushes. Flyway V2
 and its 7 PostgreSQL 17.6 schema scenarios are complete. The authorization does
 not cover the Gatling run: Workflow 05 will request that separately after
 presenting the exact dedicated target and load parameters.
+
+## EPIC002 implementation checkpoint
+
+Slices 1–7 and the preparation portion of slice 8 are complete. The application
+now issues 10-minute UUID tokens, executes idempotent `HALF_EVEN` transfers in
+one `READ_COMMITTED` transaction, applies a transaction-local PostgreSQL lock
+timeout, persists movements and the source notification intent atomically, and
+publishes pending outbox events only after RabbitMQ confirmation. Safe Problem
+Details, bounded Micrometer metrics, and operation-ID-only success correlation
+are included. The temporary unauthenticated API boundary and bearer-token TODO
+remain unchanged.
+
+The prepared `load-tests` profile contains hot-source and distributed Gatling
+simulations. They seed through public APIs, issue real tokens, require an
+explicit `dedicated-load-test` environment, reject production-like targets,
+require consistency access, and verify total money after the run. The profile
+compiled successfully, but no Gatling request was executed.
+
+Validation on 2026-08-31:
+
+- `./mvnw -B -ntp clean verify` passed 40 unit tests, 12 isolated MVC tests,
+  and the 90% eligible-line coverage gate.
+- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` passed 20 real
+  scenarios: 8 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
+  regressions, and 7 Flyway/schema scenarios. Transfer coverage includes
+  replay/mismatch, atomic rejection, 100 competing debits, money conservation,
+  cross-transfers, bounded lock failure and metrics, late-failure rollback, and
+  RabbitMQ outage/recovery.
+- `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` passed for both
+  Gatling simulations; the load goal was intentionally not run.
+- `docker compose config --quiet` and `git diff --check` passed.
+
+Independent review found no unresolved BLOCKER or HIGH issue. Review fixes made
+the PostgreSQL timeout transaction-local, separated generic transient-database
+metrics from lock-contention metrics, restricted RabbitMQ deserialization to
+the event package, and added rollback, recovery, cross-transfer, and
+100-request contention evidence. No absent quality gate is claimed.
+
+Delivery checkpoints:
+
+- `3ec5035` — EPIC002 persistence foundation and approved design artifacts.
+- `ebad351` — transfer API, transaction, outbox, metrics, tests, and prepared
+  Gatling profile.
+- `26d9879` — strengthened rollback, cross-transfer, lock-metric, and
+  100-request concurrency verification.
+
+Execution is stopped at the Gatling authorization boundary. Continuation needs
+the exact dedicated base URL, environment identity, request rate, duration,
+destination count, database consistency credentials, and cleanup behavior.

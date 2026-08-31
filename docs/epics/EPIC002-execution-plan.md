@@ -223,8 +223,10 @@ excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: in progress; development authorized on 2026-08-31
-- Completed slices: 1
+- Status: implementation and local verification complete; stopped before the
+  separately authorized Gatling execution
+- Completed slices: 1–7; slice 8 preparation is complete and its load
+  execution/finalization remains pending
 - Documentation prepared: BDR-0004, ADR-0026, ADR-0028, ADR-0029, logical data
   model, EPIC002 contract, this plan, and shared execution report
 - Decision impact: approved business, API, persistence, messaging, contention,
@@ -232,4 +234,17 @@ excluded unless separately requested.
 - Validation evidence:
   - `./mvnw -B -ntp clean -Pintegrated-functional-tests -Dit.test=DatabaseMigrationIntegratedFunctionalTest verify`
     — 7 PostgreSQL 17.6 migration/schema scenarios passed at Flyway version 2
-- Next action: implement persistence mappings and deterministic locking boundaries
+  - `./mvnw -B -ntp clean verify` — 40 unit tests, 12 isolated MVC tests, and
+    the 90% eligible-line coverage gate passed
+  - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 20 real
+    transfer, account-regression, Flyway, PostgreSQL 17.6, and RabbitMQ 4.1.4
+    scenarios passed
+  - `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` — both Gatling
+    simulations compiled; no load was executed
+  - `docker compose config --quiet` and `git diff --check` passed
+- Review: no unresolved BLOCKER or HIGH issue; timeout, metric classification,
+  rollback, recovery, cross-transfer, and 100-request contention findings were
+  applied and revalidated
+- Delivery commits: `3ec5035`, `ebad351`, and `26d9879`
+- Next action: request explicit authorization for the exact dedicated Gatling
+  target, rate, duration, consistency access, and cleanup before running it
