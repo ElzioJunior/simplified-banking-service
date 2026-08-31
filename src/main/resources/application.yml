@@ -11,11 +11,22 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      jakarta.persistence.lock.timeout: ${TRANSFER_LOCK_TIMEOUT_MS:5000}
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:simplified_banking}
     password: ${RABBITMQ_PASSWORD:simplified_banking}
+    publisher-confirm-type: correlated
+
+transfer:
+  notifications:
+    publisher:
+      enabled: ${TRANSFER_NOTIFICATION_PUBLISHER_ENABLED:true}
+      batch-size: ${TRANSFER_NOTIFICATION_BATCH_SIZE:50}
+      fixed-delay-ms: ${TRANSFER_NOTIFICATION_RETRY_DELAY_MS:1000}
+      confirm-timeout-ms: ${TRANSFER_NOTIFICATION_CONFIRM_TIMEOUT_MS:5000}
 
 server:
   port: ${SERVER_PORT:8080}

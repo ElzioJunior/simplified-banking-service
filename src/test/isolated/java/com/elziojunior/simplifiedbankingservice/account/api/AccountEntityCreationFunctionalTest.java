@@ -69,11 +69,11 @@ class AccountEntityCreationFunctionalTest {
     /** Proves missing, blank, and oversized names fail before application invocation. */
     @Test
     void shouldRejectInvalidNamesWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{\"initialBalance\":0}", "The account creation request is invalid.");
-        assertBadRequest("{\"name\":\"   \",\"initialBalance\":0}", "The account creation request is invalid.");
+        assertBadRequest("{\"initialBalance\":0}", "Invalid request", "The request is invalid.");
+        assertBadRequest("{\"name\":\"   \",\"initialBalance\":0}", "Invalid request", "The request is invalid.");
         assertBadRequest(
                 "{\"name\":\"" + "a".repeat(256) + "\",\"initialBalance\":0}",
-                "The account creation request is invalid.");
+                "Invalid request", "The request is invalid.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -81,9 +81,9 @@ class AccountEntityCreationFunctionalTest {
     /** Proves null and negative balances fail at the transport validation boundary. */
     @Test
     void shouldRejectInvalidBalancesWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{\"name\":\"Ada\"}", "The account creation request is invalid.");
+        assertBadRequest("{\"name\":\"Ada\"}", "Invalid request", "The request is invalid.");
         assertBadRequest("{\"name\":\"Ada\",\"initialBalance\":-0.001}",
-                "The account creation request is invalid.");
+                "Invalid request", "The request is invalid.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -91,7 +91,7 @@ class AccountEntityCreationFunctionalTest {
     /** Proves malformed JSON is rejected without exposing parser internals. */
     @Test
     void shouldRejectMalformedJsonWithSafeProblemDetails() throws Exception {
-        assertBadRequest("{not-json", "The request body is invalid or unreadable.");
+        assertBadRequest("{not-json", "Invalid request", "The request body is invalid or unreadable.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -104,7 +104,7 @@ class AccountEntityCreationFunctionalTest {
 
         assertBadRequest(
                 "{\"name\":\"Ada\",\"initialBalance\":99999999999999999.995}",
-                "Initial balance exceeds the supported monetary range.");
+                "Invalid account creation request", "Initial balance exceeds the supported monetary range.");
     }
 
     /** Proves unapproved account read, list, update, and deletion operations remain absent. */
@@ -129,14 +129,14 @@ class AccountEntityCreationFunctionalTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private void assertBadRequest(String content, String detail) throws Exception {
+    private void assertBadRequest(String content, String title, String detail) throws Exception {
         mockMvc.perform(post("/api/v1/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(content))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.title").value("Invalid account creation request"))
+                .andExpect(jsonPath("$.title").value(title))
                 .andExpect(jsonPath("$.detail").value(detail));
     }
 }

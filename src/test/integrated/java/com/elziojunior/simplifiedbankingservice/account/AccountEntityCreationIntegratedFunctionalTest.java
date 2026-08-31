@@ -27,7 +27,8 @@ import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.api.CreateAccountRequest;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "transfer.notifications.publisher.enabled=false")
 class AccountEntityCreationIntegratedFunctionalTest {
 
     @Container
@@ -43,7 +44,10 @@ class AccountEntityCreationIntegratedFunctionalTest {
     /** Clears owned rows and identities so every HTTP/database scenario is independent. */
     @BeforeEach
     void resetSchemaData() {
-        jdbcTemplate.execute("TRUNCATE TABLE movements, accounts RESTART IDENTITY");
+        jdbcTemplate.execute("""
+                TRUNCATE TABLE transfer_notification_outbox, transfer_idempotency_tokens,
+                    movements, accounts RESTART IDENTITY
+                """);
     }
 
     /** Proves unauthenticated HTTP creation persists the complete approved account shape. */
@@ -104,10 +108,11 @@ class AccountEntityCreationIntegratedFunctionalTest {
     /** Proves every invalid request is atomic and returns safe Problem Details. */
     @Test
     void shouldRejectInvalidRequestsWithoutPersistingAccounts() {
-        assertBadRequest(new CreateAccountRequest("   ", BigDecimal.ZERO));
-        assertBadRequest(new CreateAccountRequest("Negative sub-cent", new BigDecimal("-0.001")));
+        assertBadRequest(new CreateAccountRequest("   ", BigDecimal.ZERO), "Invalid request");
+        assertBadRequest(new CreateAccountRequest("Negative sub-cent", new BigDecimal("-0.001")), "Invalid request");
         assertBadRequest(new CreateAccountRequest(
-                "Overflow after rounding", new BigDecimal("99999999999999999.995")));
+                "Overflow after rounding", new BigDecimal("99999999999999999.995")),
+                "Invalid account creation request");
 
         assertThat(accountCount()).isZero();
     }
@@ -139,14 +144,14 @@ class AccountEntityCreationIntegratedFunctionalTest {
                 AccountResponse.class);
     }
 
-    private void assertBadRequest(CreateAccountRequest request) {
+    private void assertBadRequest(CreateAccountRequest request, String title) {
         ResponseEntity<ErrorResponse> response = restTemplate.postForEntity(
                 "/api/v1/accounts", request, ErrorResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(response.getBody()).isEqualTo(
-                new ErrorResponse(400, "Invalid account creation request"));
+                new ErrorResponse(400, title));
     }
 
     private int accountCount() {

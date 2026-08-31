@@ -59,4 +59,9 @@ public class AccountEntity {
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
+
+    /** Replaces the balance already validated by the transactional financial use case. */
+    public void updateBalance(BigDecimal balance) {
+        this.balance = balance;
+    }
 }
