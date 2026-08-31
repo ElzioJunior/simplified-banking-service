@@ -48,7 +48,7 @@
    serialization, missing/blank/oversized names, null/negative balances, safe
    RFC 9457 errors, unauthenticated/CSRF-token-free access, numeric overflow,
    and `404` behavior for unsupported account-management routes.
-3. Add an opt-in mock-free `AccountCreationIntegratedFunctionalTest` that
+3. Add an opt-in mock-free `AccountEntityCreationIntegratedFunctionalTest` that
    starts the real web application with disposable PostgreSQL 17.6, enters
    through HTTP, applies Flyway V1, and verifies positive/zero creation,
    independent generated IDs, normalized monetary round trips, persisted UTC

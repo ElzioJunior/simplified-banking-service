@@ -3,13 +3,14 @@ package com.elziojunior.simplifiedbankingservice.account.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.elziojunior.simplifiedbankingservice.api.ApiExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import com.elziojunior.simplifiedbankingservice.account.service.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
 
 class ApiExceptionHandlerTest {
 

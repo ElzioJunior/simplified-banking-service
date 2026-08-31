@@ -1,0 +1,188 @@
+package com.elziojunior.simplifiedbankingservice.account.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.stream.Stream;
+
+import com.elziojunior.simplifiedbankingservice.service.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.service.CreateAccountCommand;
+import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
+import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
+import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
+
+@ExtendWith(MockitoExtension.class)
+class CreateAccountEntityServiceTest {
+
+    private static final Instant CREATION_INSTANT = Instant.parse("2026-08-31T14:00:00.123456789Z");
+    private static final OffsetDateTime PERSISTED_CREATION_TIME =
+            OffsetDateTime.parse("2026-08-31T14:00:00.123456Z");
+
+    @Mock
+    private AccountRepository accountRepository;
+
+    private CreateAccountService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new CreateAccountService(accountRepository, Clock.fixed(CREATION_INSTANT, ZoneOffset.UTC));
+    }
+
+    /**
+     * Proves that valid input is normalized, timestamped once, persisted, and
+     * mapped with the database-generated ID required by the API contract.
+     */
+    @Test
+    void createsAnAccountWithNormalizedValuesAndGeneratedId() {
+        stubPersistedAccount(42L, "John Doe", new BigDecimal("123.45"));
+
+        CreatedAccountDto result = service.create(new CreateAccountCommand("John Doe", new BigDecimal("123.450")));
+
+        ArgumentCaptor<AccountEntity> accountCaptor = ArgumentCaptor.forClass(AccountEntity.class);
+        verify(accountRepository).save(accountCaptor.capture());
+        AccountEntity submittedAccountEntity = accountCaptor.getValue();
+        assertThat(submittedAccountEntity.getName()).isEqualTo("John Doe");
+        assertThat(submittedAccountEntity.getBalance()).isEqualByComparingTo("123.45");
+        assertThat(submittedAccountEntity.getBalance().scale()).isEqualTo(2);
+        assertThat(submittedAccountEntity.getCreatedAt()).isEqualTo(PERSISTED_CREATION_TIME);
+
+        assertThat(result.id()).isEqualTo(42L);
+        assertThat(result.name()).isEqualTo("John Doe");
+        assertThat(result.balance()).isEqualByComparingTo("123.45");
+        assertThat(result.createdAt()).isEqualTo(PERSISTED_CREATION_TIME);
+    }
+
+    /** Proves that a zero opening balance remains a valid scale-two monetary value. */
+    @Test
+    void acceptsAZeroInitialBalance() {
+        stubPersistedAccount(7L, "Zero account", new BigDecimal("0.00"));
+
+        CreatedAccountDto result = service.create(new CreateAccountCommand("Zero account", BigDecimal.ZERO));
+
+        assertThat(result.balance()).isEqualByComparingTo("0.00");
+        verify(accountRepository).save(any(AccountEntity.class));
+    }
+
+    /**
+     * Proves both HALF_EVEN tie directions so monetary normalization cannot
+     * silently drift to a different rounding rule.
+     */
+    @ParameterizedTest
+    @MethodSource("halfEvenCases")
+    void normalizesInitialBalanceUsingHalfEven(BigDecimal requested, BigDecimal expected) {
+        stubPersistedAccount(9L, "Rounded account", expected);
+
+        service.create(new CreateAccountCommand("Rounded account", requested));
+
+        ArgumentCaptor<AccountEntity> accountCaptor = ArgumentCaptor.forClass(AccountEntity.class);
+        verify(accountRepository).save(accountCaptor.capture());
+        assertThat(accountCaptor.getValue().getBalance()).isEqualByComparingTo(expected);
+    }
+
+    /**
+     * Proves that required, nonblank, and database-sized name rules fail before
+     * persistence, keeping invalid requests free of side effects.
+     */
+    @ParameterizedTest
+    @MethodSource("invalidNames")
+    void rejectsInvalidNamesBeforePersistence(String invalidName) {
+        assertThatThrownBy(() -> service.create(new CreateAccountCommand(invalidName, BigDecimal.ZERO)))
+                .isInstanceOf(AccountCreationValidationException.class);
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    /**
+     * Proves negative values are rejected before rounding, including a
+     * negative sub-cent value that would otherwise normalize to zero.
+     */
+    @ParameterizedTest
+    @MethodSource("negativeBalances")
+    void rejectsNegativeInputBeforeNormalization(BigDecimal negativeBalance) {
+        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", negativeBalance)))
+                .isInstanceOf(AccountCreationValidationException.class)
+                .hasMessage("Initial balance must be greater than or equal to zero.");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    /** Proves a missing monetary value cannot reach persistence. */
+    @Test
+    void rejectsMissingInitialBalanceBeforePersistence() {
+        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", null)))
+                .isInstanceOf(AccountCreationValidationException.class)
+                .hasMessage("Initial balance is required.");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    /**
+     * Proves range validation occurs after rounding because rounding can carry
+     * a nominally 17-digit input beyond the physical NUMERIC(19,2) boundary.
+     */
+    @Test
+    void rejectsBalanceThatOverflowsAfterNormalization() {
+        BigDecimal overflowsAfterRounding = new BigDecimal("99999999999999999.995");
+
+        assertThatThrownBy(() -> service.create(new CreateAccountCommand("John Doe", overflowsAfterRounding)))
+                .isInstanceOf(AccountCreationValidationException.class)
+                .hasMessage("Initial balance exceeds the supported monetary range.");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    /** Proves a missing command fails explicitly instead of producing a null-pointer failure. */
+    @Test
+    void rejectsMissingCreationCommand() {
+        assertThatThrownBy(() -> service.create(null))
+                .isInstanceOf(AccountCreationValidationException.class)
+                .hasMessage("Account creation data is required.");
+
+        verify(accountRepository, never()).save(any());
+    }
+
+    private static Stream<Arguments> halfEvenCases() {
+        return Stream.of(
+                Arguments.of(new BigDecimal("1.225"), new BigDecimal("1.22")),
+                Arguments.of(new BigDecimal("1.235"), new BigDecimal("1.24")));
+    }
+
+    private static Stream<String> invalidNames() {
+        return Stream.of(null, "", "   ", "a".repeat(256));
+    }
+
+    private static Stream<BigDecimal> negativeBalances() {
+        return Stream.of(new BigDecimal("-100.00"), new BigDecimal("-0.001"));
+    }
+
+    /** Supplies the generated persistence result while leaving input capture observable. */
+    private void stubPersistedAccount(long id, String name, BigDecimal balance) {
+        AccountEntity persistedAccountEntity = mock(AccountEntity.class);
+        when(persistedAccountEntity.getId()).thenReturn(id);
+        when(persistedAccountEntity.getName()).thenReturn(name);
+        when(persistedAccountEntity.getBalance()).thenReturn(balance);
+        when(persistedAccountEntity.getCreatedAt()).thenReturn(PERSISTED_CREATION_TIME);
+        when(accountRepository.save(any(AccountEntity.class))).thenReturn(persistedAccountEntity);
+    }
+}

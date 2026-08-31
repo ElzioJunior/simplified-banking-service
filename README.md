@@ -82,15 +82,15 @@ status is visible in the source documents under `docs/`.
 ## Documentation
 
 - [Documentation map](docs/README.md)
-- [Core database schema epic](docs/epics/EPIC000-core-database-schema.MD)
+- [Core database schema epic](docs/epics/EPIC000-core-database-schema.md)
 - [Development execution report](docs/epics/execution-report.md)
-- [Account creation epic](docs/epics/EPIC001-account-creation.MD)
-- [Account-to-account transfer epic](docs/epics/EPIC002-account-to-account-transfer.MD)
+- [Account creation epic](docs/epics/EPIC001-account-creation.md)
+- [Account-to-account transfer epic](docs/epics/EPIC002-account-to-account-transfer.md)
 - [Business decision records](docs/bdr/README.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Logical data model](docs/database/logical-data-model.md)
 - [Engineering standards](docs/engineering/README.md)
-- [AI-assisted delivery workflows](ai-operation/workflows/README.md)
+- [AI-assisted delivery workflows](.agents/workflows/README.md)
 
 Repository-wide contribution instructions are defined in [AGENTS.md](AGENTS.md).
 

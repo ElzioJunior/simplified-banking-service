@@ -18,10 +18,10 @@ not replace ADRs, BDRs, engineering standards, or the logical data model.
 
 ## Current artifacts
 
-- [EPIC000 — Core Database Schema](EPIC000-core-database-schema.MD)
+- [EPIC000 — Core Database Schema](EPIC000-core-database-schema.md)
 - [EPIC000 — Execution Plan](EPIC000-execution-plan.md)
-- [EPIC001 — Account Creation](EPIC001-account-creation.MD)
+- [EPIC001 — Account Creation](EPIC001-account-creation.md)
 - [EPIC001 — Execution Plan](EPIC001-execution-plan.md)
-- [EPIC002 — Account-to-Account Transfer](EPIC002-account-to-account-transfer.MD)
+- [EPIC002 — Account-to-Account Transfer](EPIC002-account-to-account-transfer.md)
 - [EPIC002 — Execution Plan](EPIC002-execution-plan.md)
 - [Development Execution Report](execution-report.md)

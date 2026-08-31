@@ -16,7 +16,7 @@ For a non-trivial change, read only the relevant documents, in this order:
 
 Repository-wide agent behavior and source priority are defined in
 [AGENTS.md](../AGENTS.md). Delivery orchestration lives under
-[AI operation](../ai-operation/).
+[agent workflows](../.agents/workflows/).
 
 ## Canonical sources
 
