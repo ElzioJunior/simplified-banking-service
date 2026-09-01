@@ -23,8 +23,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
+import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties =

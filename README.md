@@ -221,19 +221,24 @@ host Maven installation is not required.
 
 Unit tests belong under `src/test/unit/java`. Isolated functional tests belong
 under `src/test/isolated/java` and join the normal `verify` lifecycle. The
-default `verify` also enforces at least 90% eligible line coverage and does not
-require external services.
+default `verify` runs complete application scenarios against disposable
+PostgreSQL Testcontainers and enforces at least 90% eligible line coverage.
+Docker is therefore required for `verify`; `test` remains process-local and
+Docker-free.
 
-The integrated source set is opt-in, uses disposable PostgreSQL and RabbitMQ
-Testcontainers, and covers real HTTP, migrations, persistence, messaging,
-rollback, idempotency, and concurrency:
+The integrated source set is opt-in and adds exactly one focused compatibility
+scenario against a disposable RabbitMQ Testcontainer. It exercises the real
+publisher, AMQP topology, routing, JSON conversion, and consumption without
+starting PostgreSQL or executing a financial transfer:
 
 ```bash
 ./mvnw -B -ntp -Pintegrated-functional-tests verify
 ```
 
-Integrated tests verify that their PostgreSQL target is ephemeral and never
-clear database tables. Docker must be available for this profile.
+PostgreSQL-backed isolated tests prove that their datasource is their exact
+test-owned container before execution. No functional test clears database
+tables; containers are discarded whole. Docker must be available for both
+`verify` commands.
 
 ### Run Gatling load tests
 
@@ -343,8 +348,8 @@ The implemented delivery includes:
   retry.
 - Safe Problem Details, bounded-cardinality API metrics, Docker Compose local
   infrastructure, and a non-root application image.
-- Unit, isolated functional, integrated, migration, concurrency, and Gatling
-  load tests.
+- Unit tests, PostgreSQL-backed isolated functional tests, one focused RabbitMQ
+  integration test, and Gatling load tests.
 
 Authentication and authorization, account query/update/delete operations,
 movement-query APIs, and notification consumers remain future work.

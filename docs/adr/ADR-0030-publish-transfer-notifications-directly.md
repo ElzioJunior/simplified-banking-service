@@ -88,5 +88,8 @@ Tests verify registration only for a newly completed transfer, no execution
 before commit or after rollback, and no publication for replay or rejection.
 Publisher tests verify success, attempt-count exhaustion, elapsed-budget
 exhaustion, contained failure, and finite RabbitMQ connection, handshake, and
-channel RPC configuration. Integrated tests verify the real successful
-HTTP/PostgreSQL/RabbitMQ path without outbox persistence.
+channel RPC configuration. Isolated functional tests verify the application-side
+publication request after a committed transfer with RabbitMQ mocked. One focused
+integrated test verifies the production publisher, topology, routing,
+conversion, and consumption against a disposable RabbitMQ broker without
+PostgreSQL.

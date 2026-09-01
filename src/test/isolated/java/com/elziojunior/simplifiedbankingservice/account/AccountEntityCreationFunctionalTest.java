@@ -28,8 +28,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
-import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
+import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties =

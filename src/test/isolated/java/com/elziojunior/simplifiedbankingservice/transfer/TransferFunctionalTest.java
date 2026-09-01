@@ -7,22 +7,27 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import javax.sql.DataSource;
+
+import io.micrometer.core.instrument.MeterRegistry;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -38,19 +43,15 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.mockito.ArgumentCaptor;
 
+import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateTransferRequest;
-import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
 import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
-
-import javax.sql.DataSource;
-import io.micrometer.core.instrument.MeterRegistry;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {

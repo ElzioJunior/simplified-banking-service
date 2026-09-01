@@ -8,17 +8,17 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -73,7 +73,7 @@ class TransferNotificationPublisherIntegratedFunctionalTest {
         assertThat(actual.occurredAt()).isEqualTo(expected.occurredAt());
     }
 
-    @SpringBootConfiguration
+    @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration(exclude = {
             DataSourceAutoConfiguration.class,
             FlywayAutoConfiguration.class,

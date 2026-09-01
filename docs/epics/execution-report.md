@@ -9,7 +9,7 @@ This is the single execution report for all epic execution plans.
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
-| EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Planned | Awaiting development authorization |
+| EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Completed | 54 unit, 30 isolated PostgreSQL, and 1 RabbitMQ integration test passed |
 | EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | Planned | Awaiting development authorization |
 
 ## Completed foundation work
@@ -198,7 +198,7 @@ destination count, consistency access, and cleanup behavior were stated. No
 lint, static-analysis, dependency/security scanner, or standalone
 schema-quality tool is configured.
 
-## Active plan: EPIC003
+## Completed plan: EPIC003
 
 ### Planned scope
 
@@ -226,15 +226,15 @@ The application and its disposable owned PostgreSQL database form the isolated
 functional environment. RabbitMQ is not started or contacted by those flows;
 application intent is proven at the publisher boundary, while unit tests retain
 retry evidence and one real-broker test retains adapter compatibility evidence.
-Full `verify` will require Docker and take longer. Datasource guards, unique
+Full `verify` requires Docker and takes longer. Datasource guards, unique
 fixtures, scoped assertions, and whole-container disposal remain mandatory;
 tests never clear tables or connect to a shared database.
 
 ### Validation and authorization boundaries
 
-`clean test` remains process-local. `clean verify` will execute MVC slices and
-complete PostgreSQL-backed isolated flows. The opt-in integrated profile will
-add the single RabbitMQ adapter scenario. Both containers are local,
+`clean test` is process-local. `clean verify` executes MVC slices and complete
+PostgreSQL-backed isolated flows. The opt-in integrated profile adds the single
+RabbitMQ adapter scenario. Both containers are local,
 test-owned, and disposable, so no consequential Workflow 05 pause is expected.
 The change requires a superseding ADR and coordinated testing-standard,
 workflow, skill, Maven, README, and reporting updates; product behavior, APIs,
@@ -287,20 +287,20 @@ expected. EPIC004 adds no RabbitMQ, integrated, or Gatling scenario.
 
 ## Source control
 
-EPIC001 and EPIC002 were delivered in coherent non-destructive commits. EPIC003
-and EPIC004 planning artifacts remain in the worktree for review. Authorization
-for either Epic covers coherent non-destructive commits and pushes for only its
-planned slices, quality/review fixes, applicable verification, and
-finalization. Unrelated worktree changes remain outside those commits. Amend,
+EPIC001, EPIC002, and EPIC003 were delivered in coherent non-destructive
+commits. EPIC004 planning artifacts remain in the worktree for review.
+Authorization for an Epic covers coherent non-destructive commits and pushes
+for only its planned slices, quality/review fixes, applicable verification,
+and finalization. Unrelated worktree changes remain outside those commits. Amend,
 squash, force-push, history rewriting, pull request creation, merge,
 deployment, and release remain excluded unless separately requested.
 
 ## Authorization
 
-Historical EPIC001 and EPIC002 development and Gatling authorizations are
-complete. EPIC003 and EPIC004 development are not yet authorized. EPIC003 must
-complete before EPIC004 implements PostgreSQL-backed functional scenarios so
-the new source-set convention is available. Once granted for an Epic,
+Historical EPIC001, EPIC002, and EPIC003 development authorizations and the
+EPIC002 Gatling authorization are complete. EPIC004 development is not yet
+authorized. EPIC003 established the source-set convention required by EPIC004.
+Once granted for an Epic,
 development authorization covers its approved implementation, normal quality
 and review fix loops, disposable local test execution, documentation
 synchronization, and normal non-destructive commits and pushes. No separate
@@ -381,13 +381,6 @@ Delivery checkpoints:
 EPIC002 implementation, local verification, authorized load execution,
 subsequent direct-publication simplification, consistency checks, cleanup, and
 documentation are complete.
-
-## EPIC003 development authorization request
-
-Authorize execution of [EPIC003](EPIC003-execution-plan.md) as scoped above,
-including implementation, configured quality gates, review and fixes,
-disposable local PostgreSQL and RabbitMQ tests, documentation finalization, and
-normal non-destructive commits and pushes.
 
 ## EPIC004 development authorization request
 

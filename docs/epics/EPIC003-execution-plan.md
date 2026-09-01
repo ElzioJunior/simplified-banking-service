@@ -148,7 +148,7 @@ merge, deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: implementation in progress; development authorized on 2026-09-01.
+- Status: completed on 2026-09-01.
 - Completed work: EPIC003 scope, approved test-boundary direction,
   decision-impact analysis, execution plan, ADR-0031 superseding ADR-0017 and
   ADR-0018, aligned testing standard, Workflow 05, and test skills, PostgreSQL
@@ -166,13 +166,17 @@ merge, deployment, and release remain excluded unless separately requested.
   passed 54 unit tests and the single integrated scenario against one
   disposable RabbitMQ 4.1.4 broker with no PostgreSQL container. Maven tag
   filters kept the integrated scenario out of the isolated execution.
-- Remaining work: comprehensive quality execution, review, documentation
-  finalization, commits, and pushes.
+- Comprehensive validation: `./mvnw -B -ntp clean test` passed 54 unit tests
+  without Docker; `./mvnw -B -ntp clean verify` passed 54 unit and 30 isolated
+  scenarios against disposable PostgreSQL 17.6; `./mvnw -B -ntp clean
+  -Pintegrated-functional-tests verify` passed those gates plus the single
+  integrated scenario against disposable RabbitMQ 4.1.4. All coverage checks
+  passed.
 - Decision impact: one superseding ADR and coordinated engineering-standard,
   workflow, skill, Maven, README, and delivery-document updates are required.
 - Product, API, production runtime, business behavior, and logical data model:
   unchanged.
 - Expected integrated boundary: one disposable local RabbitMQ Testcontainer;
   no consequential real-boundary authorization gate is expected.
-- Next action: run the complete default and opt-in lifecycles, then perform the
-  independent review and final documentation synchronization.
+- Final review found and corrected test bootstrap leakage from the integrated
+  test's local configuration; the complete opt-in lifecycle passed afterward.
