@@ -109,6 +109,7 @@ The endpoint remains temporarily unauthenticated under
 - [x] An empty result returns a successful empty page.
 - [x] An unknown account returns `404 Not Found`.
 - [x] Invalid query parameters return safe Problem Details with `400 Bad Request`.
+- [x] Removed `start`/`end` fields and other unsupported query parameters return `400 Bad Request`.
 - [x] The API does not expose persistence entities directly.
 - [x] The query does not modify account, movement, or transfer data.
 

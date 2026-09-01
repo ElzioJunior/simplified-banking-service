@@ -1,11 +1,15 @@
 package com.elziojunior.simplifiedbankingservice.api;
 
+import java.util.Set;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.elziojunior.simplifiedbankingservice.api.documentation.AccountMovementApi;
+import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementFilterRequest;
@@ -14,22 +18,15 @@ import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
 import com.elziojunior.simplifiedbankingservice.service.ListAccountMovementsService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** HTTP adapter for the read-only account-movement listing use case. */
 @RestController
 @RequestMapping("/api/v1/accounts")
-@Tag(name = "Account movements", description = "Paginated account movement history")
-public class AccountMovementController {
+public class AccountMovementController implements AccountMovementApi {
+
+    private static final Set<String> SUPPORTED_QUERY_PARAMETERS = Set.of("page", "period", "type");
 
     private final ListAccountMovementsService listAccountMovementsService;
     private final AccountMovementMapper accountMovementMapper;
@@ -46,79 +43,29 @@ public class AccountMovementController {
      * returns only the approved page contract.
      *
      * @param accountId account whose movements are requested
-     * @param request optional page, recent-period, and type filters
+     * @param filter optional page, recent-period, and type filters
+     * @param httpRequest raw request used only to reject unknown query fields
      * @return matching movement page
      */
     @GetMapping("/{accountId}/movements")
     @ObservedApiOperation(ApiOperation.MOVEMENT_LIST)
-    @Operation(
-            summary = "List account movements",
-            description = "Returns a fixed-size page ordered newest first for the selected recent period.")
-    @Parameters({
-            @Parameter(
-                    name = "page",
-                    description = "Zero-based page; defaults to zero",
-                    examples = {
-                            @ExampleObject(name = "firstPage", value = "0"),
-                            @ExampleObject(name = "laterPage", value = "2"),
-                            @ExampleObject(name = "invalidNegativePage", value = "-1")
-                    }),
-            @Parameter(
-                    name = "period",
-                    description = "Recent-history period; defaults to 1d",
-                    examples = {
-                            @ExampleObject(name = "oneDay", value = "1d"),
-                            @ExampleObject(name = "oneWeek", value = "1w"),
-                            @ExampleObject(name = "oneMonth", value = "1M"),
-                            @ExampleObject(name = "invalidPeriod", value = "30d")
-                    }),
-            @Parameter(
-                    name = "type",
-                    description = "Optional movement direction",
-                    examples = {
-                            @ExampleObject(name = "credit", value = "CREDIT"),
-                            @ExampleObject(name = "debit", value = "DEBIT"),
-                            @ExampleObject(name = "invalidType", value = "UNKNOWN")
-                    })
-    })
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Movement page, including an empty page when no movement matches",
-                    content = @Content(
-                            schema = @Schema(implementation = AccountMovementPageResponse.class),
-                            examples = {
-                                    @ExampleObject(name = "filteredMovementPage", value = ApiExamples.MOVEMENT_PAGE),
-                                    @ExampleObject(name = "emptyMovementPage", value = ApiExamples.EMPTY_MOVEMENT_PAGE)
-                            })),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid page, period, or movement type",
-                    content = @Content(
-                            schema = @Schema(implementation = org.springframework.http.ProblemDetail.class),
-                            examples = {
-                                    @ExampleObject(name = "transportValidation", value = ApiExamples.INVALID_REQUEST),
-                                    @ExampleObject(name = "invalidPeriod", value = ApiExamples.INVALID_MOVEMENT_PERIOD)
-                            })),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Account not found",
-                    content = @Content(
-                            schema = @Schema(implementation = org.springframework.http.ProblemDetail.class),
-                            examples = @ExampleObject(name = "unknownAccount", value = ApiExamples.ACCOUNT_NOT_FOUND))),
-            @ApiResponse(
-                    responseCode = "503",
-                    description = "Movement persistence is temporarily unavailable",
-                    content = @Content(
-                            schema = @Schema(implementation = org.springframework.http.ProblemDetail.class),
-                            examples = @ExampleObject(
-                                    name = "persistenceUnavailable", value = ApiExamples.MOVEMENT_UNAVAILABLE)))
-    })
+    @Override
     public AccountMovementPageResponse list(
-            @Parameter(description = "Existing account identifier", required = true, example = "41")
             @PathVariable Long accountId,
-            @Valid @ModelAttribute AccountMovementFilterRequest request) {
-        MovementPageDto page = listAccountMovementsService.list(accountMovementMapper.toDto(accountId, request));
+            @Valid @ModelAttribute AccountMovementFilterRequest filter,
+            HttpServletRequest httpRequest) {
+        validateQueryParameters(httpRequest);
+        MovementPageDto page = listAccountMovementsService.list(accountMovementMapper.toDto(accountId, filter));
         return accountMovementMapper.toResponse(page);
+    }
+
+    /**
+     * Rejects removed or unknown query fields before application execution so
+     * clients cannot mistake a default-period response for an unsupported query.
+     */
+    private void validateQueryParameters(HttpServletRequest request) {
+        if (!SUPPORTED_QUERY_PARAMETERS.containsAll(request.getParameterMap().keySet())) {
+            throw new AccountMovementValidationException("The movement query contains unsupported parameters.");
+        }
     }
 }

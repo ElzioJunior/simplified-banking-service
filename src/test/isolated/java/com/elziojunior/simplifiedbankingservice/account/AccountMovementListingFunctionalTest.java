@@ -157,6 +157,9 @@ class AccountMovementListingFunctionalTest {
         assertBadRequest(accountId, "period", "30d");
         assertBadRequest(accountId, "period", "1m");
         assertBadRequest(accountId, "type", "UNKNOWN");
+        assertBadRequest(accountId, "start", "2026-08-01T00:00:00Z");
+        assertBadRequest(accountId, "end", "2026-09-01T00:00:00Z");
+        assertBadRequest(accountId, "sort", "createdAt");
     }
 
     /** Proves repeated reads leave every fixture row and financial value unchanged. */

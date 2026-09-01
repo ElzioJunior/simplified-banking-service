@@ -55,6 +55,10 @@ Dependencies should generally flow from API/integration boundaries toward applic
 - Controllers adapt transport concerns to application use cases.
 - Controllers must not own business rules.
 - Controllers should remain thin.
+- Place endpoint-specific OpenAPI metadata in resource interfaces under
+  `api.documentation`, implemented by the corresponding controllers. Keep
+  runtime Spring MVC mapping, binding, validation, and orchestration on the
+  concrete controller.
 - Validate transport-level input at the boundary when appropriate.
 - Convert external representations into application/domain inputs before executing business behavior.
 - Do not expose persistence entities directly through APIs.

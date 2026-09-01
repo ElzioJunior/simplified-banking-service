@@ -28,7 +28,9 @@ to its governing BDR, ADR, engineering standard, or product document.
   [ADR-0031](adr/ADR-0031-separate-isolated-application-tests-from-real-boundary-integration-tests.md).
 - The versioned REST contract and its principal success and validation examples
   are published through OpenAPI and Swagger UI under
-  [ADR-0032](adr/ADR-0032-publish-the-rest-contract-with-openapi-and-swagger-ui.md).
+  [ADR-0032](adr/ADR-0032-publish-the-rest-contract-with-openapi-and-swagger-ui.md),
+  with endpoint metadata separated from runtime controllers through documented
+  API interfaces.
 - Local metrics are collected through Prometheus and shown in a provisioned
   Grafana dashboard under
   [ADR-0033](adr/ADR-0033-use-prometheus-and-grafana-for-local-metrics-dashboards.md).

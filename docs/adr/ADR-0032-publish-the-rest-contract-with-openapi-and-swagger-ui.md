@@ -41,6 +41,15 @@ business conflicts, absent resources, and temporary persistence failure where
 the endpoint exposes that outcome. Examples must use fictional values and must
 not contain credentials, secrets, or real customer data.
 
+Define one OpenAPI documentation interface per public API resource under
+`api.documentation`. Endpoint-specific OpenAPI metadata, including tags,
+operation descriptions, parameters, responses, schemas, and examples, belongs
+in these interfaces, which are implemented by the corresponding Spring MVC
+controllers. Keep runtime mappings, request binding, validation, response
+status, metrics, and orchestration on the concrete controllers. These
+interfaces represent the documented HTTP contract and must not contain runtime
+or business behavior.
+
 Swagger UI and the generated OpenAPI description are the canonical interactive
 API and example reference. The README keeps a concise endpoint inventory and
 links to those resources instead of duplicating HTTP request and response
@@ -59,7 +68,8 @@ routes are reachable under the intended security policy.
 
 ### Negative or trade-offs
 
-- Controller and API-model annotations add documentation maintenance work.
+- Documentation interfaces and API-model annotations add maintenance work.
+- Each public controller and its documentation interface must evolve together.
 - Springdoc and Swagger UI increase the application dependency and runtime footprint.
 - Public documentation exposes the API shape, so its access policy must change when authentication is introduced.
 - Generated documentation still requires tests because inference alone cannot express every business failure accurately.
@@ -82,4 +92,5 @@ generated specification without authentication and assert all `/api/v1/**`
 operations, success examples, validation examples, and documented failure
 responses. Security tests verify the Swagger UI and OpenAPI routes are public
 while operational endpoints remain protected. The normal Maven quality gates
-must remain green.
+must remain green. Compilation must also verify that each controller implements
+its documentation interface, keeping their method signatures aligned.

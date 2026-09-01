@@ -262,6 +262,10 @@ adapter integration test. Docker Compose validation and source-set separation
 also passed. Independent review found no BLOCKER or HIGH issue; its one MEDIUM
 documentation finding was corrected. No new integrated boundary, migration,
 logical data-model change, dependency, or RabbitMQ behavior was introduced.
+Follow-up review also closed Spring MVC's silent unknown-field behavior:
+removed `start`/`end` parameters and every other unsupported query field now
+return `400` before mapping or service execution. The follow-up `clean verify`
+passed 69 unit tests, 46 isolated functional tests, and the coverage gate.
 
 ### Planned scope
 

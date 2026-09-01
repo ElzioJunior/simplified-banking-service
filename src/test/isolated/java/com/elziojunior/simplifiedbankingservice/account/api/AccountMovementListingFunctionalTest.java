@@ -150,6 +150,29 @@ class AccountMovementListingFunctionalTest {
         verify(apiMetrics, org.mockito.Mockito.times(4)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
     }
 
+    /** Proves removed date fields and arbitrary query names fail explicitly instead of silently using the default. */
+    @Test
+    void shouldRejectUnsupportedQueryParametersAndRecordRejectedMetric() throws Exception {
+        Timer.Sample sample = org.mockito.Mockito.mock(Timer.Sample.class);
+        when(apiMetrics.start()).thenReturn(sample);
+
+        assertBadRequest(
+                "?start=2026-08-01T00:00:00Z",
+                "Invalid movement query",
+                "The movement query contains unsupported parameters.");
+        assertBadRequest(
+                "?end=2026-09-01T00:00:00Z",
+                "Invalid movement query",
+                "The movement query contains unsupported parameters.");
+        assertBadRequest(
+                "?sort=createdAt",
+                "Invalid movement query",
+                "The movement query contains unsupported parameters.");
+
+        verify(listAccountMovementsService, never()).list(any());
+        verify(apiMetrics, org.mockito.Mockito.times(3)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
+    }
+
     /** Proves application validation and unknown accounts retain safe application-specific Problem Details. */
     @Test
     void shouldTranslateApplicationQueryFailures() throws Exception {

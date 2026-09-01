@@ -16,6 +16,8 @@ to `1d`.
   calendar month before the same request instant.
 - Unsupported or case-mismatched period values return safe `400` Problem
   Details before the service is called.
+- Removed `start`/`end` fields and all other unknown query parameters return
+  safe `400` Problem Details instead of silently applying the default period.
 - Period and `CREDIT`/`DEBIT` filters may be combined.
 - The repository receives real computed bounds and contains no sentinel date.
 - Existing pagination, ordering, ownership, empty-result, error, metrics, and
@@ -217,6 +219,8 @@ deployment, and release remain excluded unless separately requested.
 - Independent review found no BLOCKER or HIGH issue. Its one MEDIUM
   documentation-divergence finding was corrected in both READMEs and the
   EPIC004 delivery artifacts.
+- Follow-up validation after closing silent unknown-field binding passed 69
+  unit tests, 46 isolated functional tests, and the coverage gate.
 - Integrated scope: no new consequential boundary applies; the movement flow
   uses guarded disposable PostgreSQL, while the existing RabbitMQ regression
   remained unrelated and disposable.

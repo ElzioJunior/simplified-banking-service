@@ -28,7 +28,8 @@ The only accepted period values are:
 When `period` is absent, the API uses `1d`. Each request resolves one current
 instant and queries movements in the half-open interval from that instant minus
 the selected period through that instant. Clients cannot submit arbitrary date
-boundaries.
+boundaries. Removed `start` and `end` parameters, and every other unsupported
+query field, must return `400 Bad Request` rather than being silently ignored.
 
 All other BDR-0002 rules remain unchanged: results belong to the account in the
 path, pages contain at most 10 movements, movement type remains optional, and no
@@ -63,4 +64,5 @@ additional filters enter the current scope.
 Automated tests must verify the default `1d` period, explicit `1d`, `1w`, and
 `1M` periods, calendar-month calculation, combination with `CREDIT` and `DEBIT`,
 rejection of every unsupported period, pagination, ownership isolation, empty
-results, and unchanged persisted financial state.
+results, explicit rejection of removed or unknown query fields, and unchanged
+persisted financial state.
