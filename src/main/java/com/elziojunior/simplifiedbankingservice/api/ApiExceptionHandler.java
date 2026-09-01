@@ -16,20 +16,10 @@ import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidat
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiMetricsInterceptor;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /** Translates expected client errors into a stable and safe RFC 9457 response. */
 @RestControllerAdvice
 public class ApiExceptionHandler {
-
-    private final ApiMetrics apiMetrics;
-
-    public ApiExceptionHandler(ApiMetrics apiMetrics) {
-        this.apiMetrics = apiMetrics;
-    }
 
     /** Maps request-bean constraint violations without exposing internal details. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -78,32 +68,23 @@ public class ApiExceptionHandler {
 
     /** Maps transient contention/database failure to a retryable safe response. */
     @ExceptionHandler(PessimisticLockingFailureException.class)
-    public ProblemDetail handleLockFailure(PessimisticLockingFailureException exception, HttpServletRequest request) {
-        recordDatabaseFailure(request, exception);
+    public ProblemDetail handleLockFailure(PessimisticLockingFailureException exception) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
                 "The transfer could not acquire the required resources.");
     }
 
     /** Maps other transient database failures without misclassifying them as lock contention. */
     @ExceptionHandler(TransientDataAccessException.class)
-    public ProblemDetail handleTransientDatabaseFailure(
-            TransientDataAccessException exception, HttpServletRequest request) {
-        recordDatabaseFailure(request, exception);
+    public ProblemDetail handleTransientDatabaseFailure(TransientDataAccessException exception) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
                 "The transfer could not be completed because persistence is unavailable.");
     }
 
     /** Maps remaining database failures without leaking SQL or persistence details. */
     @ExceptionHandler(DataAccessException.class)
-    public ProblemDetail handleDatabaseFailure(DataAccessException exception, HttpServletRequest request) {
-        recordDatabaseFailure(request, exception);
+    public ProblemDetail handleDatabaseFailure(DataAccessException exception) {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
                 "The transfer could not be completed because persistence is unavailable.");
-    }
-
-    private void recordDatabaseFailure(HttpServletRequest request, DataAccessException exception) {
-        ApiMetricsInterceptor.operation(request)
-                .ifPresent(operation -> apiMetrics.recordDatabaseFailure(operation, exception));
     }
 
     /** Builds a shared client-safe RFC 9457 shape for expected API failures. */

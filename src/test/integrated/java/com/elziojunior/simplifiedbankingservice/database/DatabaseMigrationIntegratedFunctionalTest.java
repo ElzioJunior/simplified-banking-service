@@ -25,7 +25,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = "transfer.notifications.publisher.enabled=false")
 class DatabaseMigrationIntegratedFunctionalTest {
 
     @Container
@@ -173,27 +174,33 @@ class DatabaseMigrationIntegratedFunctionalTest {
     @Test
     void doesNotReapplyAnAlreadyAppliedMigration() {
         assertThat(flyway.migrate().migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
     }
 
     /**
-     * Proves V3 retains token constraints while removing the superseded outbox table.
+     * Proves V2 creates token and outbox constraints/indexes because transfer
+     * retries and notification recovery depend on database-enforced uniqueness.
      */
     @Test
-    void retainsTransferTokenSchemaAndRemovesOutbox() {
+    void createsTransferTokenAndOutboxSchema() {
         assertColumn("transfer_idempotency_tokens", "token", "uuid", null, null, "NO");
         assertNullableNumericColumn("transfer_idempotency_tokens", "amount", 19, 2);
+        assertColumn("transfer_notification_outbox", "event_id", "uuid", null, null, "NO");
+        assertColumn("transfer_notification_outbox", "amount", "numeric", null, 2, "NO");
 
         assertThat(constraintNames("transfer_idempotency_tokens")).contains(
                 "pk_transfer_idempotency_tokens",
                 "uq_transfer_idempotency_tokens_operation",
                 "chk_transfer_tokens_association");
+        assertThat(constraintNames("transfer_notification_outbox")).contains(
+                "pk_transfer_notification_outbox",
+                "uq_transfer_outbox_operation_recipient_event",
+                "chk_transfer_outbox_event_type");
 
         assertThat(indexNames("transfer_idempotency_tokens"))
                 .contains("idx_transfer_tokens_unused_expiration");
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT to_regclass('public.transfer_notification_outbox')",
-                String.class)).isNull();
+        assertThat(indexNames("transfer_notification_outbox"))
+                .contains("idx_transfer_outbox_pending");
     }
 
     /**

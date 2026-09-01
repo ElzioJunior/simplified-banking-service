@@ -12,6 +12,4 @@ public record TransferCompletedNotification(
         String eventType,
         BigDecimal amount,
         OffsetDateTime occurredAt) {
-
-    public static final String TRANSFER_COMPLETED = "TRANSFER_COMPLETED";
 }

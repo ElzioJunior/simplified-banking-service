@@ -1,10 +1,10 @@
 # BDR-0004 — Successful Transfer Notification Policy
 
-- Status: Superseded
+- Status: Accepted
 - Date: 2026-08-31
 - Deciders: Engineering and Product Team
 - Supersedes: none
-- Superseded by: BDR-0005
+- Superseded by: none
 
 ## Context
 

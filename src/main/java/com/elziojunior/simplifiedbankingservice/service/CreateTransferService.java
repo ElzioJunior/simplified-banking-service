@@ -18,14 +18,15 @@ import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundExcept
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
-import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
 import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 import com.elziojunior.simplifiedbankingservice.model.entity.TransferIdempotencyTokenEntity;
+import com.elziojunior.simplifiedbankingservice.model.entity.TransferNotificationOutboxEntity;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTokenRepository;
+import com.elziojunior.simplifiedbankingservice.repository.TransferNotificationOutboxRepository;
 
 /** Executes one complete idempotent account-to-account financial operation. */
 @Service
@@ -37,7 +38,7 @@ public class CreateTransferService {
     private final TransferIdempotencyTokenRepository tokenRepository;
     private final AccountRepository accountRepository;
     private final MovementRepository movementRepository;
-    private final TransferNotificationAfterCommitScheduler notificationScheduler;
+    private final TransferNotificationOutboxRepository outboxRepository;
     private final TransferLockTimeoutConfigurer lockTimeoutConfigurer;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -46,14 +47,14 @@ public class CreateTransferService {
             TransferIdempotencyTokenRepository tokenRepository,
             AccountRepository accountRepository,
             MovementRepository movementRepository,
-            TransferNotificationAfterCommitScheduler notificationScheduler,
+            TransferNotificationOutboxRepository outboxRepository,
             TransferLockTimeoutConfigurer lockTimeoutConfigurer,
             UuidGenerator uuidGenerator,
             Clock clock) {
         this.tokenRepository = tokenRepository;
         this.accountRepository = accountRepository;
         this.movementRepository = movementRepository;
-        this.notificationScheduler = notificationScheduler;
+        this.outboxRepository = outboxRepository;
         this.lockTimeoutConfigurer = lockTimeoutConfigurer;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
@@ -62,8 +63,7 @@ public class CreateTransferService {
     /**
      * Serializes token use and account mutation inside one READ_COMMITTED
      * transaction so a completed retry is replayed and every new operation is
-     * all-or-nothing across balances, movements, and token association. A new
-     * completion also schedules best-effort event publication after commit.
+     * all-or-nothing across balances, movements, token, and notification intent.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CompletedTransferDto create(CreateTransferDto transfer) {
@@ -81,14 +81,10 @@ public class CreateTransferService {
             throw new TransferConflictException("The idempotency token has expired.");
         }
 
-        AccountEntity firstLocked = lockAccount(
-                Math.min(requested.sourceAccountId(), requested.destinationAccountId()));
-        AccountEntity secondLocked = lockAccount(
-                Math.max(requested.sourceAccountId(), requested.destinationAccountId()));
+        AccountEntity firstLocked = lockAccount(Math.min(requested.sourceAccountId(), requested.destinationAccountId()));
+        AccountEntity secondLocked = lockAccount(Math.max(requested.sourceAccountId(), requested.destinationAccountId()));
         AccountEntity source = firstLocked.getId().equals(requested.sourceAccountId()) ? firstLocked : secondLocked;
-        AccountEntity destination = firstLocked.getId().equals(requested.destinationAccountId())
-                ? firstLocked
-                : secondLocked;
+        AccountEntity destination = firstLocked.getId().equals(requested.destinationAccountId()) ? firstLocked : secondLocked;
 
         if (source.getBalance().compareTo(requested.amount()) < 0) {
             throw new TransferConflictException("The source account has insufficient funds.");
@@ -104,13 +100,8 @@ public class CreateTransferService {
                 new MovementEntity(destination, operationId, MovementType.CREDIT, requested.amount(), now)));
         token.associate(operationId, source.getId(), destination.getId(), requested.amount(), now);
         tokenRepository.save(token);
-        notificationScheduler.schedule(new TransferCompletedNotification(
-                eventId,
-                operationId,
-                source.getId(),
-                TransferCompletedNotification.TRANSFER_COMPLETED,
-                requested.amount(),
-                now));
+        outboxRepository.save(new TransferNotificationOutboxEntity(
+                eventId, operationId, source.getId(), requested.amount(), now));
         return new CompletedTransferDto(operationId, source.getId(), destination.getId(), requested.amount());
     }
 
@@ -150,7 +141,9 @@ public class CreateTransferService {
     }
 
     /** Replays only an identical normalized payload so token reuse cannot change financial intent. */
-    private CompletedTransferDto replay(TransferIdempotencyTokenEntity token, ValidatedTransfer requested) {
+    private CompletedTransferDto replay(
+            TransferIdempotencyTokenEntity token,
+            ValidatedTransfer requested) {
         boolean samePayload = token.getSourceAccountId().equals(requested.sourceAccountId())
                 && token.getDestinationAccountId().equals(requested.destinationAccountId())
                 && token.getAmount().compareTo(requested.amount()) == 0;
@@ -161,6 +154,10 @@ public class CreateTransferService {
                 token.getOperationId(), token.getSourceAccountId(), token.getDestinationAccountId(), token.getAmount());
     }
 
-    private record ValidatedTransfer(UUID token, Long sourceAccountId, Long destinationAccountId, BigDecimal amount) {
+    private record ValidatedTransfer(
+            UUID token,
+            Long sourceAccountId,
+            Long destinationAccountId,
+            BigDecimal amount) {
     }
 }

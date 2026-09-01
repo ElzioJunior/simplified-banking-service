@@ -1,10 +1,10 @@
 # ADR-0028 — Use a Transactional Outbox for Transfer Notifications
 
-- Status: Superseded
+- Status: Accepted
 - Date: 2026-08-31
 - Deciders: User and Engineering Team
 - Supersedes: none
-- Superseded by: ADR-0030
+- Superseded by: none
 - Related: ADR-0015, ADR-0025, BDR-0004
 
 ## Context
