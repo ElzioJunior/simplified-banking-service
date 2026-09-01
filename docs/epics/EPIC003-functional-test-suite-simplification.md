@@ -9,9 +9,9 @@ by one focused opt-in integration test.
 
 ## Delivery status
 
-Planned. This Epic defines the test-suite reclassification and expected
-coverage; no test or build implementation is included yet. Delivery sequencing
-and validation are defined in the
+Completed on 2026-09-01. The test-suite reclassification, build configuration,
+real RabbitMQ adapter scenario, documentation, and validation were delivered as
+defined in the
 [EPIC003 execution plan](EPIC003-execution-plan.md).
 
 ## Scope
@@ -75,28 +75,28 @@ the current records must not be silently reinterpreted.
 
 ## Requirements and acceptance criteria
 
-- [ ] Account creation and database migration/constraint scenarios execute as
+- [x] Account creation and database migration/constraint scenarios execute as
       isolated functional tests against disposable PostgreSQL.
-- [ ] Transfer HTTP, transaction, persistence, rollback, idempotency, locking,
+- [x] Transfer HTTP, transaction, persistence, rollback, idempotency, locking,
       and concurrency scenarios execute as isolated functional tests against
       disposable PostgreSQL without starting or contacting RabbitMQ.
-- [ ] A successful new transfer requests exactly one notification containing
+- [x] A successful new transfer requests exactly one notification containing
       the approved event data.
-- [ ] Rejected transfers request no notification, and an idempotent replay does
+- [x] Rejected transfers request no notification, and an idempotent replay does
       not request an additional notification.
-- [ ] Publisher unit tests continue to prove routing invocation, bounded retry,
+- [x] Publisher unit tests continue to prove routing invocation, bounded retry,
       and contained exhausted failures.
-- [ ] Exactly one focused integrated test proves the production publisher and
+- [x] Exactly one focused integrated test proves the production publisher and
       AMQP topology against a disposable RabbitMQ broker.
-- [ ] The RabbitMQ integration test publishes and consumes the approved event
+- [x] The RabbitMQ integration test publishes and consumes the approved event
       with matching identifiers, type, recipient, amount, and timestamp.
-- [ ] No functional test clears database tables or connects to a non-test-owned
+- [x] No functional test clears database tables or connects to a non-test-owned
       PostgreSQL instance.
-- [ ] Unit tests remain process-local; the isolated functional lifecycle may
+- [x] Unit tests remain process-local; the isolated functional lifecycle may
       require Docker for PostgreSQL; RabbitMQ remains opt-in.
-- [ ] Maven configuration, test names, documentation, workflows, and skills use
+- [x] Maven configuration, test names, documentation, workflows, and skills use
       one consistent test-boundary definition.
-- [ ] Existing production behavior and observable contracts remain unchanged.
+- [x] Existing production behavior and observable contracts remain unchanged.
 
 ## Risks and failure behavior
 

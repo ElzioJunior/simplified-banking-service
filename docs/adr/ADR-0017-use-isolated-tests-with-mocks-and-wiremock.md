@@ -1,10 +1,10 @@
 # ADR-0017 — Use Isolated Tests with Mocks and WireMock
 
-- Status: Proposed
+- Status: Superseded
 - Date: 2026-08-31
 - Deciders: Engineering Team
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0031
 
 ## Context
 

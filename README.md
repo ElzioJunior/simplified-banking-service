@@ -1,14 +1,14 @@
 # Simplified Banking Service
 
 Simplified Banking Service is a Java/Spring Boot REST API for a deliberately
-small digital-banking domain. Its documented scope covers account creation and
-safe account-to-account transfers, with financial consistency and traceability
-as primary constraints.
+small digital-banking domain. Its documented scope covers account creation,
+safe account-to-account transfers, and bounded account movement history, with
+financial consistency and traceability as primary constraints.
 
 The service currently implements account creation, server-issued transfer
-idempotency tokens, atomic account-to-account transfers, financial movements,
-best-effort RabbitMQ notifications, operational metrics, and automated
-functional and load-test suites.
+idempotency tokens, atomic account-to-account transfers, paginated financial
+movement queries, best-effort RabbitMQ notifications, operational metrics, and
+automated functional and load-test suites.
 
 ## Implemented capabilities
 
@@ -26,6 +26,8 @@ functional and load-test suites.
   partial financial effects under concurrent requests.
 - Record each successful transfer as one debit and one credit movement sharing
   the same operation identifier.
+- List one account's movements in fixed pages of 10 with optional date range
+  and `CREDIT`/`DEBIT` filters.
 - Lock transfer accounts in ascending ID order inside one `READ_COMMITTED`
   transaction with a configurable lock timeout.
 - Request synchronous best-effort publication of a `TRANSFER_COMPLETED` event
@@ -38,8 +40,6 @@ functional and load-test suites.
 ## Current limitations
 
 - Account retrieval, listing, update, and deletion endpoints are not provided.
-- Movement-query endpoints are not implemented; movements are currently an
-  internal persistence and traceability mechanism.
 - Overdrafts, fees, exchange rates, scheduled transfers, and corrective
   financial operations are outside the current scope.
 - `/api/v1/**` is temporarily unauthenticated and excluded from CSRF checks.
@@ -79,6 +79,38 @@ Successful response: `201 Created`.
 
 The name is required, nonblank, and limited to 255 characters. The initial
 balance is required and must be non-negative.
+
+### List account movements
+
+```http
+GET /api/v1/accounts/1/movements?page=0&start=2026-08-01T00:00:00Z&end=2026-09-01T00:00:00Z&type=CREDIT
+```
+
+Successful response: `200 OK`.
+
+```json
+{
+  "content": [
+    {
+      "id": 42,
+      "operationId": "f6608b62-b6ba-4da2-864d-b8d49c48fb85",
+      "type": "CREDIT",
+      "amount": 100.00,
+      "createdAt": "2026-08-31T18:45:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 10,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+`page` defaults to zero. `start` is inclusive, `end` is exclusive, and
+`type` accepts only `CREDIT` or `DEBIT`. Results are ordered by occurrence time
+and movement ID descending. Invalid parameters return safe `400` Problem
+Details, an unknown account returns `404`, and an existing account without
+matches returns an empty `200` page.
 
 ### Issue a transfer token
 
@@ -221,19 +253,24 @@ host Maven installation is not required.
 
 Unit tests belong under `src/test/unit/java`. Isolated functional tests belong
 under `src/test/isolated/java` and join the normal `verify` lifecycle. The
-default `verify` also enforces at least 90% eligible line coverage and does not
-require external services.
+default `verify` runs complete application scenarios against disposable
+PostgreSQL Testcontainers and enforces at least 90% eligible line coverage.
+Docker is therefore required for `verify`; `test` remains process-local and
+Docker-free.
 
-The integrated source set is opt-in, uses disposable PostgreSQL and RabbitMQ
-Testcontainers, and covers real HTTP, migrations, persistence, messaging,
-rollback, idempotency, and concurrency:
+The integrated source set is opt-in and adds exactly one focused compatibility
+scenario against a disposable RabbitMQ Testcontainer. It exercises the real
+publisher, AMQP topology, routing, JSON conversion, and consumption without
+starting PostgreSQL or executing a financial transfer:
 
 ```bash
 ./mvnw -B -ntp -Pintegrated-functional-tests verify
 ```
 
-Integrated tests verify that their PostgreSQL target is ephemeral and never
-clear database tables. Docker must be available for this profile.
+PostgreSQL-backed isolated tests prove that their datasource is their exact
+test-owned container before execution. No functional test clears database
+tables; containers are discarded whole. Docker must be available for both
+`verify` commands.
 
 ### Run Gatling load tests
 
@@ -337,17 +374,19 @@ The implemented delivery includes:
 - Flyway V1 accounts/movements, V2 transfer-idempotency history, and V3 outbox
   removal.
 - Account creation with validation and monetary normalization.
+- Read-only account movement history with fixed pagination and optional date
+  and movement-type filters.
 - Server-issued transfer tokens and idempotent, atomic, pessimistically locked
   transfers.
 - Direct best-effort RabbitMQ transfer-completed events with bounded in-memory
   retry.
 - Safe Problem Details, bounded-cardinality API metrics, Docker Compose local
   infrastructure, and a non-root application image.
-- Unit, isolated functional, integrated, migration, concurrency, and Gatling
-  load tests.
+- Unit tests, PostgreSQL-backed isolated functional tests, one focused RabbitMQ
+  integration test, and Gatling load tests.
 
-Authentication and authorization, account query/update/delete operations,
-movement-query APIs, and notification consumers remain future work.
+Authentication and authorization, account query/update/delete operations, and
+notification consumers remain future work.
 
 The canonical local quality command is:
 

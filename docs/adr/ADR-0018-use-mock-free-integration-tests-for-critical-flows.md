@@ -1,10 +1,10 @@
 # ADR-0018 — Use Mock-Free Integration Tests for Critical Flows
 
-- Status: Proposed
+- Status: Superseded
 - Date: 2026-08-31
 - Deciders: Engineering Team
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0031
 
 ## Context
 

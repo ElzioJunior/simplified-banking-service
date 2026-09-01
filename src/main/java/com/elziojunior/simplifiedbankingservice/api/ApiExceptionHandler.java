@@ -1,5 +1,7 @@
 package com.elziojunior.simplifiedbankingservice.api;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -13,11 +15,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountMovementNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiMetricsInterceptor;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -50,18 +55,39 @@ public class ApiExceptionHandler {
     }
 
     /** Maps missing token headers and transfer validation without exposing rejected payloads. */
-    @ExceptionHandler({MissingRequestHeaderException.class, MethodArgumentTypeMismatchException.class,
-            TransferValidationException.class})
+    @ExceptionHandler({MissingRequestHeaderException.class, TransferValidationException.class})
     public ProblemDetail handleTransferValidation(Exception exception) {
         String detail;
         if (exception instanceof TransferValidationException) {
             detail = exception.getMessage();
-        } else if (exception instanceof MissingRequestHeaderException) {
-            detail = "The Idempotency-Key header is required.";
         } else {
-            detail = "The Idempotency-Key header is invalid.";
+            detail = "The Idempotency-Key header is required.";
         }
         return problem(HttpStatus.BAD_REQUEST, "Invalid transfer request", detail);
+    }
+
+    /** Maps failed request-parameter conversion without exposing rejected values or parser details. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        if (UUID.class.equals(exception.getRequiredType())) {
+            return problem(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid transfer request",
+                    "The Idempotency-Key header is invalid.");
+        }
+        return problem(HttpStatus.BAD_REQUEST, "Invalid movement query", "The request parameters are invalid.");
+    }
+
+    /** Maps an invalid movement range or application query without exposing financial data. */
+    @ExceptionHandler(AccountMovementValidationException.class)
+    public ProblemDetail handleMovementValidation(AccountMovementValidationException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid movement query", exception.getMessage());
+    }
+
+    /** Maps an absent movement-history account to the safe not-found contract. */
+    @ExceptionHandler(AccountMovementNotFoundException.class)
+    public ProblemDetail handleMovementAccountNotFound(AccountMovementNotFoundException exception) {
+        return problem(HttpStatus.NOT_FOUND, "Account not found", exception.getMessage());
     }
 
     /** Maps absent accounts to the documented safe not-found contract. */
@@ -80,8 +106,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(PessimisticLockingFailureException.class)
     public ProblemDetail handleLockFailure(PessimisticLockingFailureException exception, HttpServletRequest request) {
         recordDatabaseFailure(request, exception);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
-                "The transfer could not acquire the required resources.");
+        return persistenceUnavailable(request, "The transfer could not acquire the required resources.");
     }
 
     /** Maps other transient database failures without misclassifying them as lock contention. */
@@ -89,7 +114,8 @@ public class ApiExceptionHandler {
     public ProblemDetail handleTransientDatabaseFailure(
             TransientDataAccessException exception, HttpServletRequest request) {
         recordDatabaseFailure(request, exception);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
+        return persistenceUnavailable(
+                request,
                 "The transfer could not be completed because persistence is unavailable.");
     }
 
@@ -97,13 +123,28 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ProblemDetail handleDatabaseFailure(DataAccessException exception, HttpServletRequest request) {
         recordDatabaseFailure(request, exception);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable",
+        return persistenceUnavailable(
+                request,
                 "The transfer could not be completed because persistence is unavailable.");
     }
 
     private void recordDatabaseFailure(HttpServletRequest request, DataAccessException exception) {
         ApiMetricsInterceptor.operation(request)
                 .ifPresent(operation -> apiMetrics.recordDatabaseFailure(operation, exception));
+    }
+
+    /** Selects operation-specific safe persistence wording without exposing database details. */
+    private ProblemDetail persistenceUnavailable(HttpServletRequest request, String transferDetail) {
+        boolean movementQuery = ApiMetricsInterceptor.operation(request)
+                .filter(operation -> operation == ApiOperation.MOVEMENT_LIST)
+                .isPresent();
+        if (movementQuery) {
+            return problem(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Movement query temporarily unavailable",
+                    "The movements could not be retrieved because persistence is unavailable.");
+        }
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Transfer temporarily unavailable", transferDetail);
     }
 
     /** Builds a shared client-safe RFC 9457 shape for expected API failures. */

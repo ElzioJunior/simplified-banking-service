@@ -22,6 +22,10 @@ to its governing BDR, ADR, engineering standard, or product document.
 - Transfer lock contention has a configurable bound, no automatic
   whole-transfer retry, and a safe RFC 9457 failure mapping under
   [ADR-0029](adr/ADR-0029-handle-transfer-contention-with-bounded-failure.md).
+- Complete application flows using guarded disposable PostgreSQL belong to the
+  isolated functional lifecycle, while opt-in integrated tests qualify named
+  real adapter or external-system boundaries under
+  [ADR-0031](adr/ADR-0031-separate-isolated-application-tests-from-real-boundary-integration-tests.md).
 
 ## Open
 
