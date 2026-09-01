@@ -1,10 +1,10 @@
 # BDR-0002 — Financial Movement Query Rules
 
-- Status: Proposed
+- Status: Superseded
 - Date: 2026-08-31
 - Deciders: Engineering and Product Team
 - Supersedes: none
-- Superseded by: none
+- Superseded by: BDR-0006
 
 ## Context
 

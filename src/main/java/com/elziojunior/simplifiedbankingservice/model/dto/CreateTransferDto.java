@@ -11,9 +11,5 @@ import java.util.UUID;
  * @param destinationAccountId account to credit
  * @param amount requested monetary amount
  */
-public record CreateTransferDto(
-        UUID token,
-        Long sourceAccountId,
-        Long destinationAccountId,
-        BigDecimal amount) {
+public record CreateTransferDto(UUID token, Long sourceAccountId, Long destinationAccountId, BigDecimal amount) {
 }

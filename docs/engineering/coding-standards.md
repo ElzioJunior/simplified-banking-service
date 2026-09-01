@@ -41,6 +41,7 @@ Typical packages/layers:
 - `model.entity` — persistence entities and persistence-owned enums.
 - `model.mapper` — MapStruct mappings between API models and application DTOs.
 - `exception` — application-specific exception types shared across layers.
+- `metrics` — reusable Micrometer instrumentation with bounded metric names and tags.
 - `service` — application orchestration and business behavior.
 - `repository` — persistence access.
 - `configuration` — Spring and infrastructure configuration.
@@ -54,6 +55,10 @@ Dependencies should generally flow from API/integration boundaries toward applic
 - Controllers adapt transport concerns to application use cases.
 - Controllers must not own business rules.
 - Controllers should remain thin.
+- Place endpoint-specific OpenAPI metadata in resource interfaces under
+  `api.documentation`, implemented by the corresponding controllers. Keep
+  runtime Spring MVC mapping, binding, validation, and orchestration on the
+  concrete controller.
 - Validate transport-level input at the boundary when appropriate.
 - Convert external representations into application/domain inputs before executing business behavior.
 - Do not expose persistence entities directly through APIs.
@@ -81,6 +86,9 @@ Dependencies should generally flow from API/integration boundaries toward applic
 ## Service Layer
 
 - Services coordinate application use cases and business behavior.
+- Name service classes after the cohesive resource or capability they own, not
+  after a single action. Name their public methods after the specific use case,
+  such as `AccountService.createAccount`, so call sites communicate intent.
 - Keep services cohesive and focused on a clear capability.
 - Avoid large service classes that accumulate unrelated use cases.
 - Express business rules with explicit domain language.
@@ -245,6 +253,18 @@ Avoid:
 ## Line Length and Formatting
 
 - Maximum line length: **200 characters**.
+- Keep a method or constructor declaration's complete parameter list on the
+  same line when the resulting line is at most **120 characters**. Break the
+  parameter list only when that line would exceed 120 characters.
+- Apply the same 120-character rule to method and constructor invocations:
+  keep arguments on the same line while the complete invocation fits, and wrap
+  only when it would exceed the threshold. Syntax that is inherently
+  multiline, such as text blocks or multiline lambdas, is exempt.
+- When wrapping is necessary, group parameters or arguments into the fewest
+  readable continuation lines that stay within 120 characters; one item per
+  line is not required.
+- For parameter and argument lists, this 120-character rule takes precedence
+  over the general preference for shorter lines.
 - Prefer shorter lines when they improve readability.
 - Follow configured formatter and static-analysis rules.
 - Do not manually format code in conflict with automated formatting.

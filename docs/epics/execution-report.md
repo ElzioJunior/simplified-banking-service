@@ -8,7 +8,9 @@ This is the single execution report for all epic execution plans.
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
-| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Awaiting load authorization | Implementation, review, and local gates passed; Gatling prepared but not run |
+| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
+| EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Completed | 54 unit, 30 isolated PostgreSQL, and 1 RabbitMQ integration test passed |
+| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | Completed | Fixed `1d`/`1w`/`1M` periods; all configured gates passed |
 
 ## Completed foundation work
 
@@ -139,28 +141,27 @@ is configured, so none is claimed.
 - Final review fixes and documentation are recorded by the subsequent
   finalization commit in branch history.
 
-## Active plan: EPIC002
+## Completed plan: EPIC002
 
 ### Planned scope
 
 Deliver only server-issued 10-minute transfer tokens, atomic
 account-to-account transfers through `POST /api/v1/transfers`, exactly two
-correlated movements, and one durable asynchronous notification intent for the
-source account holder. Movement-query APIs, notification delivery channels,
+correlated movements, and one best-effort direct RabbitMQ notification event
+for the source account holder. Movement-query APIs, notification delivery channels,
 authentication, overdrafts, fees, scheduled transfers, and a separate Transfer
 entity remain excluded.
 
 ### Delivery order
 
-1. Add Flyway V2 token/outbox storage and verify real PostgreSQL constraints.
+1. Keep Flyway V2 history, add V3 outbox removal, and verify real PostgreSQL constraints.
 2. Add persistence mappings, repositories, deterministic pessimistic locking,
    and configurable bounded lock waiting.
 3. Implement and expose token issuance.
 4. Implement the single-transaction idempotent transfer use case.
 5. Expose the versioned transfer API and safe RFC 9457 failures.
-6. Publish durable notification intents to RabbitMQ after commit with confirms
-   and retry of pending outbox records.
-7. Prove rollback, recovery, idempotency, and concurrency through real
+6. Publish notifications directly to RabbitMQ with bounded in-memory retry.
+7. Prove rollback, direct publication, idempotency, and concurrency through real
    HTTP/PostgreSQL/RabbitMQ Testcontainers.
 8. Prepare Gatling load simulations, then complete quality gates, review, and
    documentation.
@@ -170,10 +171,9 @@ entity remain excluded.
 ADR-0026 fixes the token endpoint and `Idempotency-Key` contract. ADR-0024 and
 ADR-0025 require ascending-ID pessimistic locks within one `READ_COMMITTED`
 transaction. ADR-0029 bounds lock waiting, prohibits automatic whole-transfer
-retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0028 uses a
-transactional outbox so RabbitMQ availability cannot determine the financial
-commit. RabbitMQ publication is at least once, so stable event identity is
-mandatory for downstream deduplication. Hot accounts intentionally serialize;
+retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0030 uses direct
+best-effort RabbitMQ publication after commit with count- and time-bounded retry
+and no durable recovery or atomic database/broker boundary. Hot accounts intentionally serialize;
 distributed accounts should retain independent throughput. The API remains
 temporarily unauthenticated under ADR-0027 and is unsuitable for untrusted
 network exposure. ADR-0008 supplies bounded Micrometer outcome, latency,
@@ -192,65 +192,206 @@ Those resources are local and disposable, so they do not require a
 consequential-boundary pause.
 
 Gatling targets a separately running dedicated environment and can create
-sustained load. Workflow 05 must stop immediately before its first run and ask
-for authorization naming the base URL, environment, concurrency, duration, and
-cleanup. No lint, static-analysis, dependency/security scanner, or standalone
+sustained load. Its first execution was authorized for a disposable local
+environment after the base URL, environment identity, request rate, duration,
+destination count, consistency access, and cleanup behavior were stated. No
+lint, static-analysis, dependency/security scanner, or standalone
 schema-quality tool is configured.
+
+## Completed plan: EPIC003
+
+### Planned scope
+
+Reclassify complete application/PostgreSQL Testcontainers scenarios as isolated
+functional tests, keep PostgreSQL real and guarded, and mock
+`TransferNotificationPublisher` in transfer flows. Preserve exactly one
+opt-in integrated class that verifies the production publisher, AMQP topology,
+routing, serialization, and consumption against disposable RabbitMQ without
+starting PostgreSQL or executing a financial transfer.
+
+### Delivery order
+
+1. Supersede the conflicting proposed test ADRs and align the engineering
+   standard, workflow, and test skills with the approved boundary taxonomy.
+2. Move the account, migration, and transfer PostgreSQL scenarios into the
+   isolated source set and align Maven lifecycle behavior.
+3. Replace RabbitMQ in transfer flows with a publisher mock and verify exact
+   event interactions for completion, replay, and rejection.
+4. Add the single narrow RabbitMQ publisher/topology integration scenario.
+5. Run all affected gates and synchronize developer and delivery documentation.
+
+### Decisions and risks
+
+The application and its disposable owned PostgreSQL database form the isolated
+functional environment. RabbitMQ is not started or contacted by those flows;
+application intent is proven at the publisher boundary, while unit tests retain
+retry evidence and one real-broker test retains adapter compatibility evidence.
+Full `verify` requires Docker and takes longer. Datasource guards, unique
+fixtures, scoped assertions, and whole-container disposal remain mandatory;
+tests never clear tables or connect to a shared database.
+
+### Validation and authorization boundaries
+
+`clean test` is process-local. `clean verify` executes MVC slices and complete
+PostgreSQL-backed isolated flows. The opt-in integrated profile adds the single
+RabbitMQ adapter scenario. Both containers are local,
+test-owned, and disposable, so no consequential Workflow 05 pause is expected.
+The change requires a superseding ADR and coordinated testing-standard,
+workflow, skill, Maven, README, and reporting updates; product behavior, APIs,
+production runtime, and the logical data model remain unchanged.
+
+## Completed plan: EPIC004
+
+### Fixed lookback contract revision
+
+On 2026-09-01, BDR-0006 superseded the original arbitrary `start` and `end`
+contract. The public endpoint now accepts only `period=1d|1w|1M`, defaults to
+`1d`, computes one deterministic half-open window through the application
+clock, and retains optional `CREDIT`/`DEBIT` filtering. The repository no
+longer substitutes a historical sentinel when date input is absent.
+
+Unit tests prove exact day, week, and calendar-month calculations. MVC and
+OpenAPI tests prove the default, all public values, invalid values, type
+combinations, and removal of `start`/`end` from the published contract. Five
+real HTTP/PostgreSQL scenarios prove boundaries, pagination, ownership,
+filtering, safe failures, and read-only behavior without clearing tables.
+
+Final validation passed 68 unit tests, 45 isolated functional tests, the 90%
+eligible-line coverage gate, and the existing single disposable RabbitMQ
+adapter integration test. Docker Compose validation and source-set separation
+also passed. Independent review found no BLOCKER or HIGH issue; its one MEDIUM
+documentation finding was corrected. No new integrated boundary, migration,
+logical data-model change, dependency, or RabbitMQ behavior was introduced.
+Follow-up review also closed Spring MVC's silent unknown-field behavior:
+removed `start`/`end` parameters and every other unsupported query field now
+return `400` before mapping or service execution. The follow-up `clean verify`
+passed 69 unit tests, 46 isolated functional tests, and the coverage gate.
+
+### Planned scope
+
+Deliver only the read-only
+`GET /api/v1/accounts/{accountId}/movements` endpoint with zero-based,
+fixed-10-item pagination, deterministic newest-first ordering, and optional
+`start`, `end`, and `CREDIT`/`DEBIT` filters. Return a custom API page envelope,
+an empty successful page for an existing account without matches, `404` for an
+unknown account, and safe `400` Problem Details for invalid query input. No
+write behavior, advanced filters, client-selected size/sort, migration,
+dependency, RabbitMQ change, or Gatling scenario is included.
+
+### Delivery order
+
+1. Add the account-scoped pageable repository query, purpose-specific DTOs, and
+   read-only listing service with focused unit tests.
+2. Add MapStruct mappings, API records, the thin versioned controller, safe
+   errors, bounded movement-list metrics, and isolated MVC tests.
+3. Add mock-free HTTP/PostgreSQL pagination and filter scenarios using the
+   guarded disposable isolated environment established by EPIC003 without
+   clearing tables.
+4. Run quality gates and independent review, apply findings, synchronize
+   documentation, and finalize delivery.
+
+### Decisions and risks
+
+BDR-0002 supplies account scope, the 10-item limit, optional date range, and
+`CREDIT`/`DEBIT` filters. EPIC004 fixes `[start, end)` range semantics,
+zero-based pages, newest-first `createdAt`/`id` ordering, and a custom response
+envelope so persistence and Spring Data types do not leak into the API. Flyway
+V1 and the logical model already support the query; pagination correctness,
+equal-timestamp ordering, lazy-loading behavior, and ownership isolation are
+the material implementation risks. The temporary unauthenticated `/api/v1/**`
+boundary remains unchanged and is unsuitable for untrusted-network exposure.
+
+### Validation and authorization boundaries
+
+Default `test` is process-local. `verify` enforces coverage and adds real HTTP
+and disposable PostgreSQL evidence for ownership, pagination, ordering, every
+supported filter combination, empty results, errors, and read-only behavior.
+The isolated suite uses unique fixtures and whole-container cleanup, so no
+consequential Workflow 05 pause is
+expected. EPIC004 adds no RabbitMQ, integrated, or Gatling scenario.
 
 ## Source control
 
-EPIC001 was delivered in coherent non-destructive commits on `feature/ep001`.
-If EPIC002 development is authorized, coherent non-destructive commits and
-pushes on `feature/ep002` are included through review and finalization. Existing
-unrelated `.gitkeep` deletions remain outside EPIC002 commits. Force-push,
-history rewriting, pull requests, merges, deployments, releases, and Gatling
-execution remain excluded unless their respective authorization is explicit.
+EPIC001, EPIC002, EPIC003, and EPIC004 were delivered in coherent
+non-destructive commits.
+Authorization for an Epic covers coherent non-destructive commits and pushes
+for only its planned slices, quality/review fixes, applicable verification,
+and finalization. Unrelated worktree changes remain outside those commits.
+Amend, squash, force-push, history rewriting, pull request creation, merge,
+deployment, and release remain excluded unless separately requested.
 
 ## Authorization
 
-Development authorization was granted on 2026-08-31. It covers the planned
-implementation, local quality and disposable integrated tests, review/fix
-loops, documentation, and normal non-destructive commits and pushes. Flyway V2
-and its 7 PostgreSQL 17.6 schema scenarios are complete. The authorization does
-not cover the Gatling run: Workflow 05 will request that separately after
-presenting the exact dedicated target and load parameters.
+Historical EPIC001 through EPIC004 development authorizations and the EPIC002
+Gatling authorization are complete. EPIC003 established the source-set
+convention used by EPIC004. Once granted for an Epic,
+development authorization covers its approved implementation, normal quality
+and review fix loops, disposable local test execution, documentation
+synchronization, and normal non-destructive commits and pushes. EPIC004 needed
+no separate Gatling or consequential real-boundary authorization.
 
 ## EPIC002 implementation checkpoint
 
 Slices 1–7 and the preparation portion of slice 8 are complete. The application
 now issues 10-minute UUID tokens, executes idempotent `HALF_EVEN` transfers in
 one `READ_COMMITTED` transaction, applies a transaction-local PostgreSQL lock
-timeout, persists movements and the source notification intent atomically, and
-publishes pending outbox events only after RabbitMQ confirmation. Safe Problem
+timeout, persists movements and token association atomically, and requests a
+direct best-effort RabbitMQ event publication for each new transfer. Safe Problem
 Details, bounded Micrometer metrics, and operation-ID-only success correlation
 are included. The temporary unauthenticated API boundary and bearer-token TODO
 remain unchanged.
 
-The prepared `load-tests` profile contains hot-source and distributed Gatling
+The `load-tests` profile contains hot-source and distributed Gatling
 simulations. They seed through public APIs, issue real tokens, require an
 explicit `dedicated-load-test` environment, reject production-like targets,
-require consistency access, and verify total money after the run. The profile
-compiled successfully, but no Gatling request was executed.
+require consistency access, and verify total money after the run. Both
+simulations ran successfully against a disposable application, PostgreSQL
+17.6 database, and RabbitMQ 4.1.4 broker; cleanup discarded the complete
+containers without clearing database tables.
 
 Validation on 2026-08-31:
 
-- `./mvnw -B -ntp clean verify` passed 40 unit tests, 12 isolated MVC tests,
+- `./mvnw -B -ntp verify` passed 43 unit tests, 12 isolated MVC tests,
   and the 90% eligible-line coverage gate.
-- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` passed 20 real
-  scenarios: 8 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
+- `./mvnw -B -ntp -Pintegrated-functional-tests verify` passed 18 real
+  scenarios: 6 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
   regressions, and 7 Flyway/schema scenarios. Transfer coverage includes
   replay/mismatch, atomic rejection, 100 competing debits, money conservation,
-  cross-transfers, bounded lock failure and metrics, late-failure rollback, and
-  RabbitMQ outage/recovery.
-- `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` passed for both
-  Gatling simulations; the load goal was intentionally not run.
+  cross-transfers, bounded lock failure and metrics, direct RabbitMQ
+  publication, and Flyway V3 outbox removal.
+- `DistributedTransferSimulation` passed 300/300 requests at 10 requests/second
+  with zero failures, 9 ms mean latency, 14 ms p95, and conserved total money.
+- `HotSourceTransferSimulation` passed 300/300 requests at 10 requests/second
+  with zero failures, 6 ms mean latency, 9 ms p95, and conserved total money.
+- Gatling 3.15 initially exposed Spring Boot dependency-management selecting
+  incompatible Netty 4.1 modules. The `load-tests` profile now selects Netty
+  4.2.14.Final only for load execution; both simulations passed after the fix.
 - `docker compose config --quiet` and `git diff --check` passed.
 
-Independent review found no unresolved BLOCKER or HIGH issue. Review fixes made
-the PostgreSQL timeout transaction-local, separated generic transient-database
-metrics from lock-contention metrics, restricted RabbitMQ deserialization to
-the event package, and added rollback, recovery, cross-transfer, and
-100-request contention evidence. No absent quality gate is claimed.
+The original delivery review found no unresolved BLOCKER or HIGH issue. Review
+fixes made the PostgreSQL timeout transaction-local, separated generic
+transient-database metrics from lock-contention metrics, restricted RabbitMQ
+deserialization to the event package, and added rollback, recovery,
+cross-transfer, and 100-request contention evidence. The later outbox recovery
+mechanism was explicitly superseded by ADR-0030, which was later refined to
+move direct publication after commit with count- and time-bounded retry. Flyway
+V3 remains unchanged. No absent quality gate is claimed.
+
+On 2026-09-01, notification hardening moved the synchronous best-effort send to
+a transaction `afterCommit` callback so RabbitMQ connection waits cannot retain
+token or account locks and rolled-back transfers cannot emit completion events.
+The RabbitMQ client now has finite TCP connection, AMQP handshake, and channel
+RPC timeouts; the publisher also stops retrying after its configured monotonic
+duration budget or attempt limit. Focused unit, default quality, and real
+RabbitMQ validation completed successfully:
+
+- `./mvnw -B -ntp -Dtest=TransferNotificationPublisherTest,TransferNotificationAfterCommitSchedulerTest,TransferNotificationConfigurationTest,CreateTransferServiceTest test`
+  passed 19 focused scenarios.
+- `./mvnw -B -ntp clean verify` passed 50 unit tests, 12 isolated functional
+  tests, and the 90% eligible-line coverage gate.
+- `./mvnw -B -ntp -Pintegrated-functional-tests verify` passed all 18 real
+  PostgreSQL/RabbitMQ scenarios, including notification consumption after a
+  committed transfer.
 
 Delivery checkpoints:
 
@@ -260,6 +401,6 @@ Delivery checkpoints:
 - `26d9879` — strengthened rollback, cross-transfer, lock-metric, and
   100-request concurrency verification.
 
-Execution is stopped at the Gatling authorization boundary. Continuation needs
-the exact dedicated base URL, environment identity, request rate, duration,
-destination count, database consistency credentials, and cleanup behavior.
+EPIC002 implementation, local verification, authorized load execution,
+subsequent direct-publication simplification, consistency checks, cleanup, and
+documentation are complete.

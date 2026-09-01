@@ -2,9 +2,9 @@
 
 ## Objective
 
-Plan, implement when requested, and execute opt-in scenarios through the real
-application and the consequential external boundaries identified by the
-project's architecture and test plan.
+Plan, implement when requested, and execute opt-in scenarios through the named
+real public or adapter boundary identified by the project's architecture and
+test plan.
 
 Examples include a real model/provider, paid API, shared production-like
 environment, hardware, cloud resource, or third-party sandbox with side effects
@@ -19,6 +19,9 @@ or rate/cost consequences.
 - Integrated Java sources use the repository's dedicated opt-in source set and
   naming convention.
 - Unit and isolated functional suites remain independent of real providers.
+- The production implementation is used for the boundary under qualification;
+  collateral application boundaries may be controlled when the approved
+  scenario intentionally qualifies one focused adapter.
 
 If no consequential real-boundary test applies, record that decision with
 evidence in the execution report and continue to Workflow 06 without inventing

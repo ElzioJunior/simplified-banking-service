@@ -22,8 +22,8 @@ public class HotSourceTransferSimulation extends Simulation {
         TransferLoadSupport.validateDedicatedTarget();
     }
 
-    private final long source = TransferLoadSupport.createAccount(
-            "Gatling hot source", String.valueOf(TransferLoadSupport.RATE * TransferLoadSupport.DURATION_SECONDS + 100));
+    private final long source = TransferLoadSupport.createAccount("Gatling hot source",
+            String.valueOf(TransferLoadSupport.RATE * TransferLoadSupport.DURATION_SECONDS + 100));
     private final List<Long> destinations = java.util.stream.IntStream.range(0, TransferLoadSupport.DESTINATION_COUNT)
             .mapToObj(index -> TransferLoadSupport.createAccount("Gatling hot destination " + index, "0"))
             .toList();

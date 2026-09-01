@@ -22,3 +22,8 @@ Start from [the ADR template](ADR-template.md) and maintain an index below.
 - [ADR-0027 — Defer API Authentication for the Initial Scope](ADR-0027-defer-api-authentication-for-the-initial-scope.md)
 - [ADR-0028 — Use a Transactional Outbox for Transfer Notifications](ADR-0028-use-a-transactional-outbox-for-transfer-notifications.md)
 - [ADR-0029 — Handle Transfer Contention with Bounded Failure](ADR-0029-handle-transfer-contention-with-bounded-failure.md)
+- [ADR-0030 — Publish Transfer Notifications Directly After Commit](ADR-0030-publish-transfer-notifications-directly.md)
+- [ADR-0031 — Separate Isolated Application Tests from Real-Boundary Integration Tests](ADR-0031-separate-isolated-application-tests-from-real-boundary-integration-tests.md)
+- [ADR-0032 — Publish the REST Contract with OpenAPI and Swagger UI](ADR-0032-publish-the-rest-contract-with-openapi-and-swagger-ui.md)
+- [ADR-0033 — Use Prometheus and Grafana for Local Metrics Dashboards](ADR-0033-use-prometheus-and-grafana-for-local-metrics-dashboards.md)
+- [ADR-0034 — Use Docker Compose for Complete Local Product Startup](ADR-0034-use-docker-compose-for-complete-local-product-startup.md)

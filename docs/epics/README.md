@@ -24,4 +24,8 @@ not replace ADRs, BDRs, engineering standards, or the logical data model.
 - [EPIC001 — Execution Plan](EPIC001-execution-plan.md)
 - [EPIC002 — Account-to-Account Transfer](EPIC002-account-to-account-transfer.md)
 - [EPIC002 — Execution Plan](EPIC002-execution-plan.md)
+- [EPIC003 — Functional Test Suite Simplification](EPIC003-functional-test-suite-simplification.md)
+- [EPIC003 — Execution Plan](EPIC003-execution-plan.md)
+- [EPIC004 — Account Movement Listing](EPIC004-account-movement-listing.md)
+- [EPIC004 — Execution Plan](EPIC004-execution-plan.md)
 - [Development Execution Report](execution-report.md)

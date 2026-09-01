@@ -18,24 +18,44 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:simplified_banking}
     password: ${RABBITMQ_PASSWORD:simplified_banking}
-    publisher-confirm-type: correlated
 
 transfer:
   notifications:
     publisher:
-      enabled: ${TRANSFER_NOTIFICATION_PUBLISHER_ENABLED:true}
-      batch-size: ${TRANSFER_NOTIFICATION_BATCH_SIZE:50}
-      fixed-delay-ms: ${TRANSFER_NOTIFICATION_RETRY_DELAY_MS:1000}
-      confirm-timeout-ms: ${TRANSFER_NOTIFICATION_CONFIRM_TIMEOUT_MS:5000}
+      max-attempts: ${TRANSFER_NOTIFICATION_MAX_ATTEMPTS:3}
+      max-duration: ${TRANSFER_NOTIFICATION_MAX_DURATION:3s}
+      connection-timeout: ${TRANSFER_NOTIFICATION_CONNECTION_TIMEOUT:1s}
+      handshake-timeout: ${TRANSFER_NOTIFICATION_HANDSHAKE_TIMEOUT:1s}
+      channel-rpc-timeout: ${TRANSFER_NOTIFICATION_CHANNEL_RPC_TIMEOUT:1s}
 
 server:
   port: ${SERVER_PORT:8080}
+
+springdoc:
+  api-docs:
+    enabled: true
+  paths-to-match: /api/v1/**
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    distribution:
+      percentiles-histogram:
+        banking.api.request.latency: true
+      slo:
+        banking.api.request.latency: 50ms,100ms,250ms,500ms,1s,2s
+
+observability:
+  prometheus:
+    public-scrape-enabled: ${PROMETHEUS_PUBLIC_SCRAPE_ENABLED:false}

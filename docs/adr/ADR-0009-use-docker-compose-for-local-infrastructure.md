@@ -4,7 +4,7 @@
 - Date: 2026-08-31
 - Deciders: Engineering Team
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0034
 
 ## Context
 
