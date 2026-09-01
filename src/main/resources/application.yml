@@ -31,11 +31,31 @@ transfer:
 server:
   port: ${SERVER_PORT:8080}
 
+springdoc:
+  api-docs:
+    enabled: true
+  paths-to-match: /api/v1/**
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    distribution:
+      percentiles-histogram:
+        banking.api.request.latency: true
+      slo:
+        banking.api.request.latency: 50ms,100ms,250ms,500ms,1s,2s
+
+observability:
+  prometheus:
+    public-scrape-enabled: ${PROMETHEUS_PUBLIC_SCRAPE_ENABLED:false}

@@ -137,6 +137,8 @@ class AccountEntityCreationFunctionalTest {
     void shouldKeepActuatorProtected() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized());
     }
 
     private void assertBadRequest(String content, String title, String detail) throws Exception {
