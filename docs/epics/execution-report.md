@@ -172,8 +172,8 @@ ADR-0026 fixes the token endpoint and `Idempotency-Key` contract. ADR-0024 and
 ADR-0025 require ascending-ID pessimistic locks within one `READ_COMMITTED`
 transaction. ADR-0029 bounds lock waiting, prohibits automatic whole-transfer
 retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0030 uses direct
-best-effort RabbitMQ publication with bounded in-memory retry and no durable
-recovery or atomic database/broker boundary. Hot accounts intentionally serialize;
+best-effort RabbitMQ publication after commit with count- and time-bounded retry
+and no durable recovery or atomic database/broker boundary. Hot accounts intentionally serialize;
 distributed accounts should retain independent throughput. The API remains
 temporarily unauthenticated under ADR-0027 and is unsuitable for untrusted
 network exposure. ADR-0008 supplies bounded Micrometer outcome, latency,
@@ -350,9 +350,25 @@ fixes made the PostgreSQL timeout transaction-local, separated generic
 transient-database metrics from lock-contention metrics, restricted RabbitMQ
 deserialization to the event package, and added rollback, recovery,
 cross-transfer, and 100-request contention evidence. The later outbox recovery
-mechanism was explicitly superseded by ADR-0030; direct publication and Flyway
-V3 were revalidated through the configured unit, isolated, and integrated
-gates. No absent quality gate is claimed.
+mechanism was explicitly superseded by ADR-0030, which was later refined to
+move direct publication after commit with count- and time-bounded retry. Flyway
+V3 remains unchanged. No absent quality gate is claimed.
+
+On 2026-09-01, notification hardening moved the synchronous best-effort send to
+a transaction `afterCommit` callback so RabbitMQ connection waits cannot retain
+token or account locks and rolled-back transfers cannot emit completion events.
+The RabbitMQ client now has finite TCP connection, AMQP handshake, and channel
+RPC timeouts; the publisher also stops retrying after its configured monotonic
+duration budget or attempt limit. Focused unit, default quality, and real
+RabbitMQ validation completed successfully:
+
+- `./mvnw -B -ntp -Dtest=TransferNotificationPublisherTest,TransferNotificationAfterCommitSchedulerTest,TransferNotificationConfigurationTest,CreateTransferServiceTest test`
+  passed 19 focused scenarios.
+- `./mvnw -B -ntp clean verify` passed 50 unit tests, 12 isolated functional
+  tests, and the 90% eligible-line coverage gate.
+- `./mvnw -B -ntp -Pintegrated-functional-tests verify` passed all 18 real
+  PostgreSQL/RabbitMQ scenarios, including notification consumption after a
+  committed transfer.
 
 Delivery checkpoints:
 

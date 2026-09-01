@@ -14,8 +14,9 @@ to its governing BDR, ADR, engineering standard, or product document.
 - Transfer clients obtain a 10-minute server-issued token from
   `POST /api/v1/transfer-tokens` and submit it through `Idempotency-Key` under
   [ADR-0026](adr/ADR-0026-use-server-issued-idempotency-tokens-for-transfers.md).
-- Newly completed transfers request one best-effort direct RabbitMQ publication
-  with bounded in-memory retry and no durable notification state under
+- Newly completed transfers request one synchronous best-effort RabbitMQ
+  publication after the financial commit, with count- and time-bounded retry
+  and no durable notification state under
   [BDR-0005](bdr/BDR-0005-use-best-effort-transfer-notifications.md) and
   [ADR-0030](adr/ADR-0030-publish-transfer-notifications-directly.md).
 - Transfer lock contention has a configurable bound, no automatic

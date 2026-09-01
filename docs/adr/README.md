@@ -22,4 +22,4 @@ Start from [the ADR template](ADR-template.md) and maintain an index below.
 - [ADR-0027 — Defer API Authentication for the Initial Scope](ADR-0027-defer-api-authentication-for-the-initial-scope.md)
 - [ADR-0028 — Use a Transactional Outbox for Transfer Notifications](ADR-0028-use-a-transactional-outbox-for-transfer-notifications.md)
 - [ADR-0029 — Handle Transfer Contention with Bounded Failure](ADR-0029-handle-transfer-contention-with-bounded-failure.md)
-- [ADR-0030 — Publish Transfer Notifications Directly](ADR-0030-publish-transfer-notifications-directly.md)
+- [ADR-0030 — Publish Transfer Notifications Directly After Commit](ADR-0030-publish-transfer-notifications-directly.md)

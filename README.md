@@ -28,8 +28,8 @@ functional and load-test suites.
   the same operation identifier.
 - Lock transfer accounts in ascending ID order inside one `READ_COMMITTED`
   transaction with a configurable lock timeout.
-- Request direct best-effort publication of a `TRANSFER_COMPLETED` event to
-  RabbitMQ for each newly completed transfer.
+- Request synchronous best-effort publication of a `TRANSFER_COMPLETED` event
+  to RabbitMQ after each newly completed transfer commits.
 - Expose operational metrics for throughput, latency, failures, timeouts, and
   lock contention.
 - Validate database migrations, real HTTP/PostgreSQL/RabbitMQ behavior,
@@ -154,11 +154,12 @@ RabbitMQ topology:
 - Queue: `banking.transfer.notifications.completed`
 - Routing key: `transfer.completed`
 
-Identical transfer replays do not request another publication. Publication may
-be retried a bounded number of times in memory, but exhausted attempts do not
-invalidate the financial transfer. RabbitMQ publication and the PostgreSQL
-commit are not atomic, so an event may be lost, duplicated, or observed before
-a later transaction failure.
+Identical transfer replays do not request another publication. After the
+PostgreSQL commit releases financial locks, publication runs synchronously with
+finite connection, handshake, channel RPC, attempt-count, and total-duration
+bounds. Exhausted attempts do not invalidate the committed transfer. The event
+may still be lost if the process stops after commit or duplicated by RabbitMQ
+or network behavior.
 
 ## Architecture
 
@@ -283,7 +284,11 @@ Application runtime settings:
 | `RABBITMQ_USERNAME` | `simplified_banking` | RabbitMQ user |
 | `RABBITMQ_PASSWORD` | `simplified_banking` | RabbitMQ password |
 | `TRANSFER_LOCK_TIMEOUT_MS` | `5000` | Positive transaction-local PostgreSQL lock timeout |
-| `TRANSFER_NOTIFICATION_MAX_ATTEMPTS` | `3` | Maximum direct RabbitMQ publication attempts |
+| `TRANSFER_NOTIFICATION_MAX_ATTEMPTS` | `3` | Maximum RabbitMQ publication attempts after commit |
+| `TRANSFER_NOTIFICATION_MAX_DURATION` | `3s` | Total monotonic publication retry budget |
+| `TRANSFER_NOTIFICATION_CONNECTION_TIMEOUT` | `1s` | RabbitMQ TCP connection timeout |
+| `TRANSFER_NOTIFICATION_HANDSHAKE_TIMEOUT` | `1s` | RabbitMQ AMQP handshake timeout |
+| `TRANSFER_NOTIFICATION_CHANNEL_RPC_TIMEOUT` | `1s` | RabbitMQ channel RPC timeout |
 
 Compose infrastructure additionally accepts `POSTGRES_DB`, `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, `POSTGRES_PORT`, and `RABBITMQ_MANAGEMENT_PORT`. Gatling

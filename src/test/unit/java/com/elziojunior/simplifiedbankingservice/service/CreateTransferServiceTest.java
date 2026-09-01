@@ -49,7 +49,7 @@ class CreateTransferServiceTest {
     @Mock private TransferIdempotencyTokenRepository tokenRepository;
     @Mock private AccountRepository accountRepository;
     @Mock private MovementRepository movementRepository;
-    @Mock private TransferNotificationPublisher notificationPublisher;
+    @Mock private TransferNotificationAfterCommitScheduler notificationScheduler;
     @Mock private TransferLockTimeoutConfigurer lockTimeoutConfigurer;
 
     private CreateTransferService service;
@@ -63,7 +63,7 @@ class CreateTransferServiceTest {
                 tokenRepository,
                 accountRepository,
                 movementRepository,
-                notificationPublisher,
+                notificationScheduler,
                 lockTimeoutConfigurer,
                 uuidGenerator,
                 Clock.fixed(Instant.parse("2026-08-31T19:00:00Z"), ZoneOffset.UTC));
@@ -87,7 +87,7 @@ class CreateTransferServiceTest {
         verify(movementRepository).saveAll(any());
         ArgumentCaptor<TransferCompletedNotification> notification =
                 ArgumentCaptor.forClass(TransferCompletedNotification.class);
-        verify(notificationPublisher).publish(notification.capture());
+        verify(notificationScheduler).schedule(notification.capture());
         assertThat(notification.getValue().eventId()).isEqualTo(EVENT);
         assertThat(notification.getValue().operationId()).isEqualTo(OPERATION);
         assertThat(notification.getValue().recipientAccountId()).isEqualTo(20L);
@@ -110,7 +110,7 @@ class CreateTransferServiceTest {
         assertThat(result.transferId()).isEqualTo(OPERATION);
         verify(accountRepository, never()).findByIdForUpdate(any());
         verify(movementRepository, never()).saveAll(any());
-        verify(notificationPublisher, never()).publish(any());
+        verify(notificationScheduler, never()).schedule(any());
     }
 
     /** Proves a completed token cannot authorize a different normalized payload. */
@@ -193,7 +193,7 @@ class CreateTransferServiceTest {
                 .isInstanceOf(TransferConflictException.class);
 
         verify(movementRepository, never()).saveAll(any());
-        verify(notificationPublisher, never()).publish(any());
+        verify(notificationScheduler, never()).schedule(any());
     }
 
     private CreateTransferDto command(long sourceId, long destinationId, String amount) {

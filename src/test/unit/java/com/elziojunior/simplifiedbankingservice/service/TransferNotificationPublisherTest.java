@@ -1,6 +1,8 @@
 package com.elziojunior.simplifiedbankingservice.service;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -9,7 +11,9 @@ import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -25,7 +29,8 @@ class TransferNotificationPublisherTest {
     @Test
     void shouldPublishEventDirectly() {
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
-        TransferNotificationPublisher publisher = new TransferNotificationPublisher(rabbitTemplate, 3);
+        TransferNotificationPublisher publisher =
+                new TransferNotificationPublisher(rabbitTemplate, 3, Duration.ofSeconds(3));
         TransferCompletedNotification notification = notification();
 
         publisher.publish(notification);
@@ -40,7 +45,8 @@ class TransferNotificationPublisherTest {
     @Test
     void shouldRetryFailedPublication() {
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
-        TransferNotificationPublisher publisher = new TransferNotificationPublisher(rabbitTemplate, 3);
+        TransferNotificationPublisher publisher =
+                new TransferNotificationPublisher(rabbitTemplate, 3, Duration.ofSeconds(3));
         TransferCompletedNotification notification = notification();
         doThrow(brokerFailure()).doThrow(brokerFailure()).doNothing()
                 .when(rabbitTemplate).convertAndSend(
@@ -60,7 +66,8 @@ class TransferNotificationPublisherTest {
     @Test
     void shouldContainExhaustedPublicationFailure() {
         RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
-        TransferNotificationPublisher publisher = new TransferNotificationPublisher(rabbitTemplate, 3);
+        TransferNotificationPublisher publisher =
+                new TransferNotificationPublisher(rabbitTemplate, 3, Duration.ofSeconds(3));
         TransferCompletedNotification notification = notification();
         doThrow(brokerFailure()).when(rabbitTemplate).convertAndSend(
                 TransferNotificationConfiguration.EXCHANGE,
@@ -73,6 +80,46 @@ class TransferNotificationPublisherTest {
                 TransferNotificationConfiguration.EXCHANGE,
                 TransferNotificationConfiguration.ROUTING_KEY,
                 notification);
+    }
+
+    /** Proves elapsed publication budget stops another retry even before the attempt limit is reached. */
+    @Test
+    void shouldStopRetryingWhenPublicationDurationIsExhausted() {
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+        AtomicLong elapsedNanos = new AtomicLong();
+        TransferNotificationPublisher publisher = new TransferNotificationPublisher(
+                rabbitTemplate, 3, Duration.ofSeconds(2)) {
+            @Override
+            long nanoTime() {
+                return elapsedNanos.get();
+            }
+        };
+        TransferCompletedNotification notification = notification();
+        doAnswer(invocation -> {
+            elapsedNanos.addAndGet(Duration.ofSeconds(2).toNanos());
+            throw brokerFailure();
+        }).when(rabbitTemplate).convertAndSend(
+                TransferNotificationConfiguration.EXCHANGE,
+                TransferNotificationConfiguration.ROUTING_KEY,
+                notification);
+
+        assertThatCode(() -> publisher.publish(notification)).doesNotThrowAnyException();
+
+        verify(rabbitTemplate).convertAndSend(
+                TransferNotificationConfiguration.EXCHANGE,
+                TransferNotificationConfiguration.ROUTING_KEY,
+                notification);
+    }
+
+    /** Proves invalid retry bounds fail during construction instead of enabling unbounded publication behavior. */
+    @Test
+    void shouldRejectNonpositiveRetryBounds() {
+        RabbitTemplate rabbitTemplate = mock(RabbitTemplate.class);
+
+        assertThatThrownBy(() -> new TransferNotificationPublisher(rabbitTemplate, 0, Duration.ofSeconds(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TransferNotificationPublisher(rabbitTemplate, 1, Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private TransferCompletedNotification notification() {

@@ -91,7 +91,7 @@ The account balance is maintained directly within the Account entity rather than
 - A token may authorize at most one normalized transfer payload and successful
   operation; reuse with that payload returns the established result.
 - Notification events are not part of the logical persistence model. A newly
-  completed transfer only requests best-effort direct publication.
+  completed transfer only requests best-effort publication after commit.
 
 Logical relationship:
 

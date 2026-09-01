@@ -37,7 +37,7 @@ public class CreateTransferService {
     private final TransferIdempotencyTokenRepository tokenRepository;
     private final AccountRepository accountRepository;
     private final MovementRepository movementRepository;
-    private final TransferNotificationPublisher notificationPublisher;
+    private final TransferNotificationAfterCommitScheduler notificationScheduler;
     private final TransferLockTimeoutConfigurer lockTimeoutConfigurer;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -46,14 +46,14 @@ public class CreateTransferService {
             TransferIdempotencyTokenRepository tokenRepository,
             AccountRepository accountRepository,
             MovementRepository movementRepository,
-            TransferNotificationPublisher notificationPublisher,
+            TransferNotificationAfterCommitScheduler notificationScheduler,
             TransferLockTimeoutConfigurer lockTimeoutConfigurer,
             UuidGenerator uuidGenerator,
             Clock clock) {
         this.tokenRepository = tokenRepository;
         this.accountRepository = accountRepository;
         this.movementRepository = movementRepository;
-        this.notificationPublisher = notificationPublisher;
+        this.notificationScheduler = notificationScheduler;
         this.lockTimeoutConfigurer = lockTimeoutConfigurer;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
@@ -63,7 +63,7 @@ public class CreateTransferService {
      * Serializes token use and account mutation inside one READ_COMMITTED
      * transaction so a completed retry is replayed and every new operation is
      * all-or-nothing across balances, movements, and token association. A new
-     * completion also requests best-effort event publication.
+     * completion also schedules best-effort event publication after commit.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CompletedTransferDto create(CreateTransferDto transfer) {
@@ -104,7 +104,7 @@ public class CreateTransferService {
                 new MovementEntity(destination, operationId, MovementType.CREDIT, requested.amount(), now)));
         token.associate(operationId, source.getId(), destination.getId(), requested.amount(), now);
         tokenRepository.save(token);
-        notificationPublisher.publish(new TransferCompletedNotification(
+        notificationScheduler.schedule(new TransferCompletedNotification(
                 eventId,
                 operationId,
                 source.getId(),
