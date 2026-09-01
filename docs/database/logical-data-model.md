@@ -4,12 +4,11 @@
 
 The application owns the data required to manage bank accounts, current balances, and financial movements.
 
-The logical model is intentionally simplified for the current scope and consists of four core entities:
+The logical model is intentionally simplified for the current scope and consists of three core entities:
 
 - Account
 - Movement
 - TransferIdempotencyToken
-- TransferNotificationOutbox
 
 A transfer remains a business operation, but it is not represented as a separate persisted entity.
 
@@ -68,24 +67,6 @@ The account balance is maintained directly within the Account entity rather than
   - `destinationAccountId` — Normalized destination account identity, optional until first use.
   - `amount` — Normalized scale-two transfer amount, optional until first use.
 
-### TransferNotificationOutbox
-
-- Purpose: Durably records the asynchronous source-account notification intent
-  created by a successful transfer.
-- Identity: `eventId`
-- Lifecycle: Created atomically with the financial transfer, retained while
-  pending, and marked published only after RabbitMQ confirms publication.
-- Attributes:
-  - `eventId` — Stable UUID used for downstream deduplication, required.
-  - `operationId` — Related transfer UUID, required, unique for this event type and recipient.
-  - `recipientAccountId` — Source account whose holder is notified, required.
-  - `eventType` — Stable transfer-completed event type, required.
-  - `amount` — Transferred scale-two monetary value, required.
-  - `occurredAt` — Transfer completion instant, required.
-  - `publishedAt` — Confirmed RabbitMQ publication instant, optional.
-  - `publishAttempts` — Count of publication attempts, required, initially zero.
-  - `lastAttemptAt` — Most recent publication-attempt instant, optional.
-
 ## Relationships and invariants
 
 - An Account may have zero or many Movements.
@@ -109,12 +90,8 @@ The account balance is maintained directly within the Account entity rather than
 - Duplicate processing of the same logical transfer must not generate duplicate financial effects.
 - A token may authorize at most one normalized transfer payload and successful
   operation; reuse with that payload returns the established result.
-- Token consumption, balance changes, two movements, and notification-outbox
-  creation belong to the same transaction.
-- Every successful transfer has exactly one notification intent for its source
-  account; rejected and rolled-back transfers have none.
-- Notification publication state never changes whether the financial transfer
-  is considered completed.
+- Notification events are not part of the logical persistence model. A newly
+  completed transfer only requests best-effort publication after commit.
 
 Logical relationship:
 
@@ -131,8 +108,6 @@ There is no separate persisted `Transfer` entity in the current model.
 
 `TransferIdempotencyToken 0..1 ─── 1 successful operationId`
 
-`successful operationId 1 ─── 1 TransferNotificationOutbox`
-
 ## Sensitive data and retention
 
 Account balances and financial movements are considered sensitive financial data.
@@ -144,8 +119,8 @@ Account balances and financial movements are considered sensitive financial data
 - Movement deletion is not supported.
 - Historical financial movements must not be modified after successful completion except through explicitly defined corrective business processes, which are outside the current scope.
 - The `operationId` must be retained with both movements to allow a complete financial operation to be reconstructed and audited.
-- Idempotency payloads and notification intents contain account IDs and amounts
-  and receive the same sensitive-financial-data handling as movements.
+- Published notification events contain account IDs and amounts and receive the
+  same sensitive-financial-data handling as movements while in transit.
 
 ## Physical mapping notes
 
@@ -169,13 +144,9 @@ The physical database mapping must preserve the following intent:
 - The relationship from Movement to Account should be treated as lazy-loaded at the persistence layer unless a specific use case requires eager retrieval.
 - The Account entity does not need to expose or eagerly load its complete movement collection for normal account operations.
 - Database migrations must preserve these relationships, constraints, indexes, and financial invariants.
-- EPIC002 adds a later versioned migration for transfer idempotency tokens and
-  notification outbox records; Flyway V1 remains immutable.
+- EPIC002 adds a later versioned migration for transfer idempotency tokens;
+  Flyway V1 and V2 remain immutable, while V3 removes the superseded outbox table.
 - Transfer idempotency tokens must use a UUID primary key, enforce unique
   non-null `operationId` associations, index expiration/unused lookup, and
   constrain association fields to be either all absent or all present.
-- Transfer notification outbox records must use a UUID event identity, retain
-  source-account and operation references, prevent duplicate
-  transfer-completed intents, and index unpublished records for publisher work.
-- Idempotency-token and outbox foreign keys must not cascade-delete accounts or
-  financial history.
+- Idempotency-token foreign keys must not cascade-delete accounts or financial history.

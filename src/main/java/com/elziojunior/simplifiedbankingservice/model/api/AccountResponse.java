@@ -11,9 +11,5 @@ import java.time.OffsetDateTime;
  * @param balance normalized opening balance
  * @param createdAt persisted creation instant with its UTC offset
  */
-public record AccountResponse(
-        Long id,
-        String name,
-        BigDecimal balance,
-        OffsetDateTime createdAt) {
+public record AccountResponse(Long id, String name, BigDecimal balance, OffsetDateTime createdAt) {
 }
