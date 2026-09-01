@@ -15,13 +15,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.function.Supplier;
-
 import com.elziojunior.simplifiedbankingservice.api.AccountController;
 import com.elziojunior.simplifiedbankingservice.api.ApiExceptionHandler;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
-import org.junit.jupiter.api.BeforeEach;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiMetricsInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -36,9 +33,16 @@ import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapperImpl;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.configuration.SecurityConfiguration;
+import com.elziojunior.simplifiedbankingservice.configuration.ApiMetricsConfiguration;
 
 @WebMvcTest(AccountController.class)
-@Import({ApiExceptionHandler.class, SecurityConfiguration.class, AccountMapperImpl.class})
+@Import({
+        AccountMapperImpl.class,
+        ApiExceptionHandler.class,
+        ApiMetricsConfiguration.class,
+        ApiMetricsInterceptor.class,
+        SecurityConfiguration.class
+})
 class AccountEntityCreationFunctionalTest {
 
     @Autowired
@@ -49,12 +53,6 @@ class AccountEntityCreationFunctionalTest {
 
     @MockitoBean
     private ApiMetrics apiMetrics;
-
-    @BeforeEach
-    void executeObservedOperation() {
-        when(apiMetrics.observe(any(ApiOperation.class), any())).thenAnswer(invocation ->
-                invocation.<Supplier<?>>getArgument(1).get());
-    }
 
     /** Proves the public endpoint returns the complete 201 creation contract. */
     @Test

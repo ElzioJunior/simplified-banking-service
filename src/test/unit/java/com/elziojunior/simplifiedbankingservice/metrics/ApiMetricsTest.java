@@ -1,15 +1,11 @@
 package com.elziojunior.simplifiedbankingservice.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.TransientDataAccessResourceException;
-
-import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -22,7 +18,7 @@ class ApiMetricsTest {
         ApiMetrics metrics = new ApiMetrics(registry);
 
         for (ApiOperation operation : ApiOperation.values()) {
-            assertThat(metrics.observe(operation, () -> operation.metricTag())).isEqualTo(operation.metricTag());
+            metrics.recordOutcome(operation, 200, metrics.start());
             assertCount(registry, "banking.api.requests.total", operation, 1);
             assertCount(registry, "banking.api.requests.successful", operation, 1);
             assertThat(registry.timer(
@@ -30,18 +26,21 @@ class ApiMetricsTest {
         }
     }
 
-    /** Proves expected application validation is classified as rejection rather than operational failure. */
+    /** Proves client and server HTTP outcomes are classified without inspecting controller exceptions. */
     @Test
-    void shouldRecordRejectedOutcome() {
+    void shouldClassifyRejectedAndFailedOutcomes() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ApiMetrics metrics = new ApiMetrics(registry);
 
-        assertThatThrownBy(() -> metrics.observe(ApiOperation.ACCOUNT_CREATE, () -> {
-            throw new AccountCreationValidationException("invalid account");
-        })).isInstanceOf(AccountCreationValidationException.class);
+        metrics.recordOutcome(ApiOperation.ACCOUNT_CREATE, 400, metrics.start());
+        metrics.recordOutcome(ApiOperation.ACCOUNT_CREATE, 503, metrics.start());
 
+        assertCount(registry, "banking.api.requests.total", ApiOperation.ACCOUNT_CREATE, 2);
         assertCount(registry, "banking.api.requests.rejected", ApiOperation.ACCOUNT_CREATE, 1);
-        assertCount(registry, "banking.api.requests.failed", ApiOperation.ACCOUNT_CREATE, 0);
+        assertCount(registry, "banking.api.requests.failed", ApiOperation.ACCOUNT_CREATE, 1);
+        assertThat(registry.timer(
+                "banking.api.request.latency", "operation", ApiOperation.ACCOUNT_CREATE.metricTag()).count())
+                .isEqualTo(2);
     }
 
     /** Proves lock failures expose database, timeout, and contention signals for their originating API. */
@@ -50,36 +49,27 @@ class ApiMetricsTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ApiMetrics metrics = new ApiMetrics(registry);
 
-        assertThatThrownBy(() -> metrics.observe(ApiOperation.TRANSFER_CREATE, () -> {
-            throw new CannotAcquireLockException("lock detail");
-        })).isInstanceOf(CannotAcquireLockException.class);
+        metrics.recordDatabaseFailure(ApiOperation.TRANSFER_CREATE, new CannotAcquireLockException("lock detail"));
 
-        assertCount(registry, "banking.api.requests.failed", ApiOperation.TRANSFER_CREATE, 1);
         assertCount(registry, "banking.api.database.errors", ApiOperation.TRANSFER_CREATE, 1);
         assertCount(registry, "banking.api.timeouts", ApiOperation.TRANSFER_CREATE, 1);
         assertCount(registry, "banking.api.lock.contention", ApiOperation.TRANSFER_CREATE, 1);
     }
 
-    /** Proves timeout, transient, permanent database, and unexpected failures use bounded failure meters. */
+    /** Proves timeout, transient, and permanent database failures use bounded technical meters. */
     @Test
     void shouldRecordOtherFailures() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ApiMetrics metrics = new ApiMetrics(registry);
 
-        assertFailure(metrics, new QueryTimeoutException("timeout"));
-        assertFailure(metrics, new TransientDataAccessResourceException("transient"));
-        assertFailure(metrics, new DataIntegrityViolationException("database detail"));
-        assertFailure(metrics, new IllegalStateException("unexpected"));
+        metrics.recordDatabaseFailure(ApiOperation.TRANSFER_TOKEN_ISSUE, new QueryTimeoutException("timeout"));
+        metrics.recordDatabaseFailure(
+                ApiOperation.TRANSFER_TOKEN_ISSUE, new TransientDataAccessResourceException("transient"));
+        metrics.recordDatabaseFailure(
+                ApiOperation.TRANSFER_TOKEN_ISSUE, new DataIntegrityViolationException("database detail"));
 
-        assertCount(registry, "banking.api.requests.failed", ApiOperation.TRANSFER_TOKEN_ISSUE, 4);
         assertCount(registry, "banking.api.database.errors", ApiOperation.TRANSFER_TOKEN_ISSUE, 3);
         assertCount(registry, "banking.api.timeouts", ApiOperation.TRANSFER_TOKEN_ISSUE, 1);
-    }
-
-    private void assertFailure(ApiMetrics metrics, RuntimeException failure) {
-        assertThatThrownBy(() -> metrics.observe(ApiOperation.TRANSFER_TOKEN_ISSUE, () -> {
-            throw failure;
-        })).isSameAs(failure);
     }
 
     private void assertCount(SimpleMeterRegistry registry, String name, ApiOperation operation, double expected) {

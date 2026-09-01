@@ -17,11 +17,6 @@ import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
-
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-
 class TransferControllerTest {
 
     /** Proves the transport adapter maps the request and stable completed response. */
@@ -39,16 +34,11 @@ class TransferControllerTest {
         when(service.create(input)).thenReturn(completed);
         when(mapper.toResponse(completed)).thenReturn(expected);
 
-        SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        TransferResponse response = new TransferController(
-                service, new ApiMetrics(registry), mapper).create(token, request);
+        TransferResponse response = new TransferController(service, mapper).create(token, request);
 
         assertThat(response).isEqualTo(expected);
         verify(mapper).toDto(token, request);
         verify(service).create(input);
         verify(mapper).toResponse(completed);
-        assertThat(registry.counter(
-                "banking.api.requests.successful", "operation", ApiOperation.TRANSFER_CREATE.metricTag()).count())
-                .isOne();
     }
 }

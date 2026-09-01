@@ -15,8 +15,8 @@ import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
+import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 
 import jakarta.validation.Valid;
 
@@ -28,26 +28,20 @@ public class TransferController {
     private static final Logger LOGGER = LoggerFactory.getLogger(TransferController.class);
 
     private final CreateTransferService createTransferService;
-    private final ApiMetrics apiMetrics;
     private final TransferMapper transferMapper;
 
-    public TransferController(
-            CreateTransferService createTransferService,
-            ApiMetrics apiMetrics,
-            TransferMapper transferMapper) {
+    public TransferController(CreateTransferService createTransferService, TransferMapper transferMapper) {
         this.createTransferService = createTransferService;
-        this.apiMetrics = apiMetrics;
         this.transferMapper = transferMapper;
     }
 
     /** Executes or replays one transfer while keeping HTTP concerns outside financial behavior. */
     @PostMapping
+    @ObservedApiOperation(ApiOperation.TRANSFER_CREATE)
     public TransferResponse create(
             @RequestHeader("Idempotency-Key") UUID token,
             @Valid @RequestBody CreateTransferRequest request) {
-        CompletedTransferDto transfer = apiMetrics.observe(
-                ApiOperation.TRANSFER_CREATE,
-                () -> createTransferService.create(transferMapper.toDto(token, request)));
+        CompletedTransferDto transfer = createTransferService.create(transferMapper.toDto(token, request));
         LOGGER.info("Transfer request completed with operationId={}", transfer.transferId());
         return transferMapper.toResponse(transfer);
     }

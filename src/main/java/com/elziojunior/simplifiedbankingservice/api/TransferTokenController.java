@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
-import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
+import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapper;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
@@ -20,24 +20,19 @@ public class TransferTokenController {
 
     private final IssueTransferTokenService issueTransferTokenService;
     private final TransferTokenMapper transferTokenMapper;
-    private final ApiMetrics apiMetrics;
 
     public TransferTokenController(
-            IssueTransferTokenService issueTransferTokenService,
-            TransferTokenMapper transferTokenMapper,
-            ApiMetrics apiMetrics) {
+            IssueTransferTokenService issueTransferTokenService, TransferTokenMapper transferTokenMapper) {
         this.issueTransferTokenService = issueTransferTokenService;
         this.transferTokenMapper = transferTokenMapper;
-        this.apiMetrics = apiMetrics;
     }
 
     /** Issues the prerequisite token so a later transfer can be retried safely. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @ObservedApiOperation(ApiOperation.TRANSFER_TOKEN_ISSUE)
     public TransferTokenResponse issue() {
-        IssuedTransferTokenDto issued = apiMetrics.observe(
-                ApiOperation.TRANSFER_TOKEN_ISSUE,
-                issueTransferTokenService::issue);
+        IssuedTransferTokenDto issued = issueTransferTokenService.issue();
         return transferTokenMapper.toResponse(issued);
     }
 }

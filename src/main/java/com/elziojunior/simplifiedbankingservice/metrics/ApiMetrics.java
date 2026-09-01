@@ -1,14 +1,9 @@
 package com.elziojunior.simplifiedbankingservice.metrics;
 
-import java.util.function.Supplier;
-
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Component;
-
-import com.elziojunior.simplifiedbankingservice.exception.RejectedRequestException;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,45 +29,33 @@ public class ApiMetrics {
         this.registry = registry;
     }
 
-    /**
-     * Observes one complete API operation so service and transaction-completion failures are
-     * classified consistently across controllers.
-     */
-    public <T> T observe(ApiOperation operation, Supplier<T> invocation) {
-        counter(REQUESTS_TOTAL, operation).increment();
-        Timer.Sample sample = Timer.start(registry);
-        try {
-            T result = invocation.get();
-            counter(REQUESTS_SUCCESSFUL, operation).increment();
-            return result;
-        } catch (PessimisticLockingFailureException exception) {
-            recordDatabaseFailure(operation);
-            counter(TIMEOUTS, operation).increment();
-            counter(LOCK_CONTENTION, operation).increment();
-            throw exception;
-        } catch (QueryTimeoutException exception) {
-            recordDatabaseFailure(operation);
-            counter(TIMEOUTS, operation).increment();
-            throw exception;
-        } catch (TransientDataAccessException exception) {
-            recordDatabaseFailure(operation);
-            throw exception;
-        } catch (DataAccessException exception) {
-            recordDatabaseFailure(operation);
-            throw exception;
-        } catch (RuntimeException exception) {
-            counter(exception instanceof RejectedRequestException ? REQUESTS_REJECTED : REQUESTS_FAILED, operation)
-                    .increment();
-            throw exception;
-        } finally {
-            sample.stop(registry.timer(REQUEST_LATENCY, OPERATION_TAG, operation.metricTag()));
-        }
+    /** Starts latency measurement at the MVC boundary before request arguments are resolved. */
+    public Timer.Sample start() {
+        return Timer.start(registry);
     }
 
-    /** Records the shared failure counters emitted for every persistence failure. */
-    private void recordDatabaseFailure(ApiOperation operation) {
-        counter(REQUESTS_FAILED, operation).increment();
+    /** Records the final HTTP outcome and complete MVC latency for one bounded API operation. */
+    public void recordOutcome(ApiOperation operation, int status, Timer.Sample sample) {
+        counter(REQUESTS_TOTAL, operation).increment();
+        if (status < 400) {
+            counter(REQUESTS_SUCCESSFUL, operation).increment();
+        } else if (status < 500) {
+            counter(REQUESTS_REJECTED, operation).increment();
+        } else {
+            counter(REQUESTS_FAILED, operation).increment();
+        }
+        sample.stop(registry.timer(REQUEST_LATENCY, OPERATION_TAG, operation.metricTag()));
+    }
+
+    /** Records persistence-specific failure signals while the MVC boundary owns the common outcome. */
+    public void recordDatabaseFailure(ApiOperation operation, DataAccessException exception) {
         counter(DATABASE_ERRORS, operation).increment();
+        if (exception instanceof PessimisticLockingFailureException) {
+            counter(TIMEOUTS, operation).increment();
+            counter(LOCK_CONTENTION, operation).increment();
+        } else if (exception instanceof QueryTimeoutException) {
+            counter(TIMEOUTS, operation).increment();
+        }
     }
 
     private Counter counter(String name, ApiOperation operation) {
