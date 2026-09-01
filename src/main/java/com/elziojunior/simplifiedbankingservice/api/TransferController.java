@@ -15,7 +15,8 @@ import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
-import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 
 import jakarta.validation.Valid;
 
@@ -27,15 +28,15 @@ public class TransferController {
     private static final Logger LOGGER = LoggerFactory.getLogger(TransferController.class);
 
     private final CreateTransferService createTransferService;
-    private final TransferMetrics transferMetrics;
+    private final ApiMetrics apiMetrics;
     private final TransferMapper transferMapper;
 
     public TransferController(
             CreateTransferService createTransferService,
-            TransferMetrics transferMetrics,
+            ApiMetrics apiMetrics,
             TransferMapper transferMapper) {
         this.createTransferService = createTransferService;
-        this.transferMetrics = transferMetrics;
+        this.apiMetrics = apiMetrics;
         this.transferMapper = transferMapper;
     }
 
@@ -44,8 +45,9 @@ public class TransferController {
     public TransferResponse create(
             @RequestHeader("Idempotency-Key") UUID token,
             @Valid @RequestBody CreateTransferRequest request) {
-        CompletedTransferDto transfer = transferMetrics.observe(() -> createTransferService.create(
-                transferMapper.toDto(token, request)));
+        CompletedTransferDto transfer = apiMetrics.observe(
+                ApiOperation.TRANSFER_CREATE,
+                () -> createTransferService.create(transferMapper.toDto(token, request)));
         LOGGER.info("Transfer request completed with operationId={}", transfer.transferId());
         return transferMapper.toResponse(transfer);
     }

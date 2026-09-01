@@ -11,12 +11,16 @@ import java.time.OffsetDateTime;
 import com.elziojunior.simplifiedbankingservice.api.AccountController;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import org.junit.jupiter.api.Test;
 
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class AccountEntityControllerTest {
 
@@ -33,7 +37,8 @@ class AccountEntityControllerTest {
         when(mapper.toDto(request)).thenReturn(input);
         when(service.create(input)).thenReturn(created);
         when(mapper.toResponse(created)).thenReturn(expected);
-        AccountController controller = new AccountController(service, mapper);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        AccountController controller = new AccountController(service, mapper, new ApiMetrics(registry));
 
         AccountResponse response = controller.create(request);
 
@@ -41,5 +46,8 @@ class AccountEntityControllerTest {
         verify(mapper).toDto(request);
         verify(service).create(input);
         verify(mapper).toResponse(created);
+        assertThat(registry.counter(
+                "banking.api.requests.successful", "operation", ApiOperation.ACCOUNT_CREATE.metricTag()).count())
+                .isOne();
     }
 }

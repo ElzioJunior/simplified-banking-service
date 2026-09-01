@@ -11,10 +11,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.elziojunior.simplifiedbankingservice.api.TransferTokenController;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapper;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
+
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 class TransferTokenControllerTest {
 
@@ -29,11 +33,16 @@ class TransferTokenControllerTest {
         TransferTokenResponse expected = new TransferTokenResponse(token, expiresAt);
         when(service.issue()).thenReturn(issued);
         when(mapper.toResponse(issued)).thenReturn(expected);
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
-        TransferTokenResponse response = new TransferTokenController(service, mapper).issue();
+        TransferTokenResponse response = new TransferTokenController(
+                service, mapper, new ApiMetrics(registry)).issue();
 
         assertThat(response).isEqualTo(expected);
         verify(service).issue();
         verify(mapper).toResponse(issued);
+        assertThat(registry.counter(
+                "banking.api.requests.successful", "operation", ApiOperation.TRANSFER_TOKEN_ISSUE.metricTag()).count())
+                .isOne();
     }
 }

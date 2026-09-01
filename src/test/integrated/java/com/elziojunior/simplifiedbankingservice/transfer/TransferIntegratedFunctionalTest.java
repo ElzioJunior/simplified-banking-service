@@ -279,8 +279,10 @@ class TransferIntegratedFunctionalTest {
             assertThat(movementCountForAccount(source)).isZero();
             assertThat(movementCountForAccount(destination)).isZero();
             assertThat(outboxCountForRecipient(source)).isZero();
-            assertThat(meterRegistry.counter("banking.transfer.lock.contention").count()).isPositive();
-            assertThat(meterRegistry.counter("banking.transfer.timeouts").count()).isPositive();
+            assertThat(meterRegistry.counter(
+                    "banking.api.lock.contention", "operation", "transfer.create").count()).isPositive();
+            assertThat(meterRegistry.counter(
+                    "banking.api.timeouts", "operation", "transfer.create").count()).isPositive();
             connection.rollback();
         }
         assertThat(balance(source)).isEqualByComparingTo("10.00");

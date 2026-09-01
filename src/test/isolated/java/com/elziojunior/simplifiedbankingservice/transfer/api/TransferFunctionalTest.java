@@ -36,7 +36,8 @@ import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
 import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
-import com.elziojunior.simplifiedbankingservice.service.TransferMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 
 import java.util.function.Supplier;
 
@@ -62,12 +63,12 @@ class TransferFunctionalTest {
     private CreateTransferService createTransferService;
 
     @MockitoBean
-    private TransferMetrics transferMetrics;
+    private ApiMetrics apiMetrics;
 
     @BeforeEach
     void executeObservedOperation() {
-        when(transferMetrics.observe(any())).thenAnswer(invocation ->
-                invocation.<Supplier<?>>getArgument(0).get());
+        when(apiMetrics.observe(any(ApiOperation.class), any())).thenAnswer(invocation ->
+                invocation.<Supplier<?>>getArgument(1).get());
     }
 
     /** Proves token issuance is public during the temporary authentication exception. */

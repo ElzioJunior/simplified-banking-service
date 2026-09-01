@@ -8,7 +8,7 @@ This is the single execution report for all epic execution plans.
 | --- | --- | --- | --- |
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
-| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Awaiting load authorization | Implementation, review, and local gates passed; Gatling prepared but not run |
+| EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
 
 ## Completed foundation work
 
@@ -192,9 +192,10 @@ Those resources are local and disposable, so they do not require a
 consequential-boundary pause.
 
 Gatling targets a separately running dedicated environment and can create
-sustained load. Workflow 05 must stop immediately before its first run and ask
-for authorization naming the base URL, environment, concurrency, duration, and
-cleanup. No lint, static-analysis, dependency/security scanner, or standalone
+sustained load. Its first execution was authorized for a disposable local
+environment after the base URL, environment identity, request rate, duration,
+destination count, consistency access, and cleanup behavior were stated. No
+lint, static-analysis, dependency/security scanner, or standalone
 schema-quality tool is configured.
 
 ## Source control
@@ -211,9 +212,11 @@ execution remain excluded unless their respective authorization is explicit.
 Development authorization was granted on 2026-08-31. It covers the planned
 implementation, local quality and disposable integrated tests, review/fix
 loops, documentation, and normal non-destructive commits and pushes. Flyway V2
-and its 7 PostgreSQL 17.6 schema scenarios are complete. The authorization does
-not cover the Gatling run: Workflow 05 will request that separately after
-presenting the exact dedicated target and load parameters.
+and its 7 PostgreSQL 17.6 schema scenarios are complete. Separate Gatling
+authorization was granted on 2026-08-31 for `http://localhost:18080`, the
+`dedicated-load-test` identity, 10 requests/second for 30 seconds per
+simulation, 20 destinations, direct consistency access, and whole-container
+cleanup.
 
 ## EPIC002 implementation checkpoint
 
@@ -226,15 +229,17 @@ Details, bounded Micrometer metrics, and operation-ID-only success correlation
 are included. The temporary unauthenticated API boundary and bearer-token TODO
 remain unchanged.
 
-The prepared `load-tests` profile contains hot-source and distributed Gatling
+The `load-tests` profile contains hot-source and distributed Gatling
 simulations. They seed through public APIs, issue real tokens, require an
 explicit `dedicated-load-test` environment, reject production-like targets,
-require consistency access, and verify total money after the run. The profile
-compiled successfully, but no Gatling request was executed.
+require consistency access, and verify total money after the run. Both
+simulations ran successfully against a disposable application, PostgreSQL
+17.6 database, and RabbitMQ 4.1.4 broker; cleanup discarded the complete
+containers without clearing database tables.
 
 Validation on 2026-08-31:
 
-- `./mvnw -B -ntp clean verify` passed 40 unit tests, 12 isolated MVC tests,
+- `./mvnw -B -ntp verify` passed 43 unit tests, 12 isolated MVC tests,
   and the 90% eligible-line coverage gate.
 - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` passed 20 real
   scenarios: 8 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
@@ -242,8 +247,13 @@ Validation on 2026-08-31:
   replay/mismatch, atomic rejection, 100 competing debits, money conservation,
   cross-transfers, bounded lock failure and metrics, late-failure rollback, and
   RabbitMQ outage/recovery.
-- `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` passed for both
-  Gatling simulations; the load goal was intentionally not run.
+- `DistributedTransferSimulation` passed 300/300 requests at 10 requests/second
+  with zero failures, 9 ms mean latency, 14 ms p95, and conserved total money.
+- `HotSourceTransferSimulation` passed 300/300 requests at 10 requests/second
+  with zero failures, 6 ms mean latency, 9 ms p95, and conserved total money.
+- Gatling 3.15 initially exposed Spring Boot dependency-management selecting
+  incompatible Netty 4.1 modules. The `load-tests` profile now selects Netty
+  4.2.14.Final only for load execution; both simulations passed after the fix.
 - `docker compose config --quiet` and `git diff --check` passed.
 
 Independent review found no unresolved BLOCKER or HIGH issue. Review fixes made
@@ -260,6 +270,5 @@ Delivery checkpoints:
 - `26d9879` — strengthened rollback, cross-transfer, lock-metric, and
   100-request concurrency verification.
 
-Execution is stopped at the Gatling authorization boundary. Continuation needs
-the exact dedicated base URL, environment identity, request rate, duration,
-destination count, database consistency credentials, and cleanup behavior.
+EPIC002 implementation, local verification, independent review, authorized
+load execution, consistency checks, cleanup, and documentation are complete.

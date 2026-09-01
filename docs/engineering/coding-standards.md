@@ -41,6 +41,7 @@ Typical packages/layers:
 - `model.entity` — persistence entities and persistence-owned enums.
 - `model.mapper` — MapStruct mappings between API models and application DTOs.
 - `exception` — application-specific exception types shared across layers.
+- `metrics` — reusable Micrometer instrumentation with bounded metric names and tags.
 - `service` — application orchestration and business behavior.
 - `repository` — persistence access.
 - `configuration` — Spring and infrastructure configuration.

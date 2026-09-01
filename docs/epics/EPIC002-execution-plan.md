@@ -200,9 +200,11 @@ relevant code boundary with links to governing decisions.
 The normal integrated suite uses only disposable local containers and a random
 HTTP port. PostgreSQL and RabbitMQ state is isolated per suite, fixtures enter
 through real public APIs, concurrency is coordinated deterministically, and
-owned rows/queues are cleared between scenarios. This local disposable suite
-has no shared state, credentials, cost, or consequential external effect, so it
-does not require a Workflow 05 authorization pause.
+assertions are scoped to test-owned fixtures. No test clears database tables;
+isolation comes from using a database that is verified as ephemeral and is not
+the transactional development database. This local disposable suite has no
+shared state, credentials, cost, or consequential external effect, so it does
+not require a Workflow 05 authorization pause.
 
 Gatling intentionally generates sustained load against a separately running
 application. Preparation may add the profile, simulations, seed logic, and
@@ -223,10 +225,9 @@ excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: implementation and local verification complete; stopped before the
-  separately authorized Gatling execution
-- Completed slices: 1–7; slice 8 preparation is complete and its load
-  execution/finalization remains pending
+- Status: completed, including separately authorized Gatling execution and
+  finalization
+- Completed slices: 1–8
 - Documentation prepared: BDR-0004, ADR-0026, ADR-0028, ADR-0029, logical data
   model, EPIC002 contract, this plan, and shared execution report
 - Decision impact: approved business, API, persistence, messaging, contention,
@@ -234,17 +235,23 @@ excluded unless separately requested.
 - Validation evidence:
   - `./mvnw -B -ntp clean -Pintegrated-functional-tests -Dit.test=DatabaseMigrationIntegratedFunctionalTest verify`
     — 7 PostgreSQL 17.6 migration/schema scenarios passed at Flyway version 2
-  - `./mvnw -B -ntp clean verify` — 40 unit tests, 12 isolated MVC tests, and
+  - `./mvnw -B -ntp verify` — 43 unit tests, 12 isolated MVC tests, and
     the 90% eligible-line coverage gate passed
   - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 20 real
     transfer, account-regression, Flyway, PostgreSQL 17.6, and RabbitMQ 4.1.4
     scenarios passed
-  - `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` — both Gatling
-    simulations compiled; no load was executed
+  - `DistributedTransferSimulation` — 300/300 successful requests at 10
+    requests/second for 30 seconds, 14 ms p95, zero failures, and conserved
+    total money
+  - `HotSourceTransferSimulation` — 300/300 successful requests at 10
+    requests/second for 30 seconds across 20 destinations, 9 ms p95, zero
+    failures, and conserved total money
+  - load environment — disposable application on `http://localhost:18080`,
+    PostgreSQL 17.6 on port 15432, and RabbitMQ 4.1.4 on port 5673; whole
+    containers were discarded after execution and no table was cleared
   - `docker compose config --quiet` and `git diff --check` passed
 - Review: no unresolved BLOCKER or HIGH issue; timeout, metric classification,
   rollback, recovery, cross-transfer, and 100-request contention findings were
   applied and revalidated
 - Delivery commits: `3ec5035`, `ebad351`, and `26d9879`
-- Next action: request explicit authorization for the exact dedicated Gatling
-  target, rate, duration, consistency access, and cleanup before running it
+- Next action: none; EPIC002 lifecycle is complete
