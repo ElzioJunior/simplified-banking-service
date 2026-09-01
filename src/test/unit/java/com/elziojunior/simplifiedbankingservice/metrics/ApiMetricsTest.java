@@ -82,11 +82,7 @@ class ApiMetricsTest {
         })).isSameAs(failure);
     }
 
-    private void assertCount(
-            SimpleMeterRegistry registry,
-            String name,
-            ApiOperation operation,
-            double expected) {
+    private void assertCount(SimpleMeterRegistry registry, String name, ApiOperation operation, double expected) {
         assertThat(registry.counter(name, "operation", operation.metricTag()).count()).isEqualTo(expected);
     }
 }

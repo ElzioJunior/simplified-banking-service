@@ -138,10 +138,9 @@ class TransferFunctionalTest {
                 .thenThrow(new TransferConflictException("The transfer conflicts with current state."))
                 .thenThrow(new TransientDataAccessResourceException("database detail"));
 
-        assertTransferProblem(TOKEN.toString(), "Transfer account not found",
-                "A transfer account does not exist.", 404);
-        assertTransferProblem(TOKEN.toString(), "Transfer conflict",
-                "The transfer conflicts with current state.", 409);
+        assertTransferProblem(
+                TOKEN.toString(), "Transfer account not found", "A transfer account does not exist.", 404);
+        assertTransferProblem(TOKEN.toString(), "Transfer conflict", "The transfer conflicts with current state.", 409);
         assertTransferProblem(TOKEN.toString(), "Transfer temporarily unavailable",
                 "The transfer could not be completed because persistence is unavailable.", 503);
     }

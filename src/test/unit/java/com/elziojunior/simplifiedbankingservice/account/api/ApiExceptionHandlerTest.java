@@ -46,8 +46,8 @@ class ApiExceptionHandlerTest {
         ProblemDetail problem = handler.handleAccountValidation(
                 new AccountCreationValidationException("Initial balance exceeds the supported monetary range."));
 
-        assertProblem(problem, "Invalid account creation request",
-                "Initial balance exceeds the supported monetary range.");
+        assertProblem(
+                problem, "Invalid account creation request", "Initial balance exceeds the supported monetary range.");
     }
 
     /** Proves missing, malformed, and application-invalid transfer inputs remain distinct and safe. */
@@ -57,9 +57,12 @@ class ApiExceptionHandlerTest {
         ProblemDetail malformed = handler.handleTransferValidation(mock(MethodArgumentTypeMismatchException.class));
         ProblemDetail invalid = handler.handleTransferValidation(new TransferValidationException("Invalid amount."));
 
-        assertProblem(missing, HttpStatus.BAD_REQUEST, "Invalid transfer request",
-                "The Idempotency-Key header is required.");
-        assertProblem(malformed, HttpStatus.BAD_REQUEST, "Invalid transfer request",
+        assertProblem(
+                missing, HttpStatus.BAD_REQUEST, "Invalid transfer request", "The Idempotency-Key header is required.");
+        assertProblem(
+                malformed,
+                HttpStatus.BAD_REQUEST,
+                "Invalid transfer request",
                 "The Idempotency-Key header is invalid.");
         assertProblem(invalid, HttpStatus.BAD_REQUEST, "Invalid transfer request", "Invalid amount.");
     }
@@ -72,17 +75,15 @@ class ApiExceptionHandlerTest {
         ProblemDetail conflict = handler.handleTransferConflict(
                 new TransferConflictException("The transfer conflicts with current state."));
 
-        assertProblem(missing, HttpStatus.NOT_FOUND, "Transfer account not found",
-                "A transfer account does not exist.");
-        assertProblem(conflict, HttpStatus.CONFLICT, "Transfer conflict",
-                "The transfer conflicts with current state.");
+        assertProblem(
+                missing, HttpStatus.NOT_FOUND, "Transfer account not found", "A transfer account does not exist.");
+        assertProblem(conflict, HttpStatus.CONFLICT, "Transfer conflict", "The transfer conflicts with current state.");
     }
 
     /** Proves persistence failures never expose database details. */
     @Test
     void shouldMapDatabaseFailures() {
-        ProblemDetail lockFailure = handler.handleLockFailure(
-                new CannotAcquireLockException("secret lock detail"));
+        ProblemDetail lockFailure = handler.handleLockFailure(new CannotAcquireLockException("secret lock detail"));
         ProblemDetail transientFailure = handler.handleTransientDatabaseFailure(
                 new TransientDataAccessResourceException("secret database detail"));
         ProblemDetail permanentFailure = handler.handleDatabaseFailure(

@@ -7,12 +7,11 @@ delivery, and engineering context.
 
 For a non-trivial change, read only the relevant documents, in this order:
 
-1. [Product documentation](product/README.md)
-2. [Business Decision Records](bdr/README.md)
-3. [Architecture Decision Records](adr/README.md)
-4. [Engineering standards](engineering/README.md)
-5. [Logical data model](database/README.md), when data is involved
-6. [Decision register](DECISIONS.md)
+1. [Business Decision Records](bdr/README.md)
+2. [Architecture Decision Records](adr/README.md)
+3. [Engineering standards](engineering/README.md)
+4. [Logical data model](database/README.md), when data is involved
+5. [Decision register](DECISIONS.md)
 
 Repository-wide agent behavior and source priority are defined in
 [AGENTS.md](../AGENTS.md). Delivery orchestration lives under

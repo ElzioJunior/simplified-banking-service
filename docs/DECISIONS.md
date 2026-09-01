@@ -24,4 +24,4 @@ to its governing BDR, ADR, engineering standard, or product document.
 
 ## Open
 
-- None affecting the currently planned EPIC002 delivery.
+- None affecting the currently documented delivery scope.

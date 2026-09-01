@@ -35,8 +35,7 @@ class TransferTokenControllerTest {
         when(mapper.toResponse(issued)).thenReturn(expected);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
-        TransferTokenResponse response = new TransferTokenController(
-                service, mapper, new ApiMetrics(registry)).issue();
+        TransferTokenResponse response = new TransferTokenController(service, mapper, new ApiMetrics(registry)).issue();
 
         assertThat(response).isEqualTo(expected);
         verify(service).issue();

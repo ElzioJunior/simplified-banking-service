@@ -199,8 +199,8 @@ class TransferIntegratedFunctionalTest {
         long destination = createAccount("Destination", "0.00");
         UUID token = issueToken();
 
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement lock = connection.prepareStatement("SELECT id FROM accounts WHERE id = ? FOR UPDATE")) {
+        try (Connection connection = dataSource.getConnection(); PreparedStatement lock = connection.prepareStatement(
+                "SELECT id FROM accounts WHERE id = ? FOR UPDATE")) {
             connection.setAutoCommit(false);
             lock.setLong(1, source);
             lock.executeQuery();
@@ -287,8 +287,7 @@ class TransferIntegratedFunctionalTest {
         return response.getBody().token();
     }
 
-    private ResponseEntity<TransferResponse> transfer(
-            UUID token, long source, long destination, String amount) {
+    private ResponseEntity<TransferResponse> transfer(UUID token, long source, long destination, String amount) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Idempotency-Key", token.toString());
@@ -310,9 +309,7 @@ class TransferIntegratedFunctionalTest {
 
     private int movementCountForAccount(long accountId) {
         return jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM movements WHERE account_id = ?",
-                Integer.class,
-                accountId);
+                "SELECT count(*) FROM movements WHERE account_id = ?", Integer.class, accountId);
     }
 
     /** Consumes queued test notifications until it finds the event owned by the current fixture. */

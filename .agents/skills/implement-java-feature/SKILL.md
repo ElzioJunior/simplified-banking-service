@@ -9,7 +9,7 @@ description: Implement approved Java and Spring behavior while preserving reposi
 Implement production Java/Spring behavior according to an approved plan.
 
 ## Inputs
-- Approved implementation plan.
+- Approved implementation/execution plan.
 - Relevant repository context.
 
 ## Procedure

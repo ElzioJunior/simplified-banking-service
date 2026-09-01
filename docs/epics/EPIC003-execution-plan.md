@@ -1,0 +1,175 @@
+# EPIC003 — Execution Plan
+
+## Preconditions and decisions
+
+- Scope is limited to the read-only
+  `GET /api/v1/accounts/{accountId}/movements` contract defined by
+  [EPIC003](EPIC003-account-movement-listing.md) and
+  [BDR-0002](../bdr/BDR-0002-financial-movement-query-rules.md).
+- The endpoint returns only movements owned by the account in the path. It does
+  not return balances or modify account, movement, token, transfer, or
+  notification state.
+- Pagination is zero-based with page `0` as the default and a fixed maximum of
+  10 items. There is no client-selected page size.
+- Optional `start` and `end` filters use offset-bearing ISO 8601 date/time
+  values. `start` is inclusive, `end` is exclusive, and a supplied range must
+  have `start` before `end`.
+- The optional public movement types are exactly `CREDIT` and `DEBIT`, matching
+  the existing persistence enum and database constraint. No translation to
+  additional public values is planned.
+- Results use deterministic newest-first ordering by `createdAt DESC`, followed
+  by movement `id DESC` as a tie-breaker.
+- The custom response envelope contains `content`, `page`, `size`,
+  `totalElements`, and `totalPages`; persistence entities and Spring Data page
+  implementations are not exposed through the HTTP contract.
+- An existing account with no matching movements returns an empty `200 OK`
+  page. A missing account returns `404`; invalid page, date/time, range, or type
+  input returns safe RFC 9457 Problem Details with `400`.
+- `/api/v1/**` remains temporarily unauthenticated under
+  [ADR-0027](../adr/ADR-0027-defer-api-authentication-for-the-initial-scope.md).
+  EPIC003 does not expand or redesign authentication.
+- Flyway V1 already stores every required field and includes account/date and
+  account/type/date indexes. The logical model already requires this query
+  path, so no migration or logical data-model change is planned.
+- Existing Spring MVC, validation, Spring Data JPA, MapStruct, Micrometer, and
+  Testcontainers dependencies are sufficient. No new dependency is planned.
+- The decision register contains no open decision blocking this scope.
+
+## Acceptance criteria
+
+- `GET /api/v1/accounts/{accountId}/movements` returns only movements belonging
+  to the requested existing account.
+- The default request returns page zero with at most 10 items.
+- Later pages return the corresponding non-overlapping slice in deterministic
+  newest-first order.
+- `start`, `end`, `type=CREDIT`, and `type=DEBIT` work independently and in
+  combination.
+- Date/time range boundaries are applied as `[start, end)`.
+- Empty matches return `200 OK` with empty content and zero totals.
+- Unknown accounts return safe `404` Problem Details.
+- Negative page values, malformed dates, invalid/equal/reversed ranges, and
+  unsupported movement types return safe `400` Problem Details.
+- The endpoint is read-only and does not mutate financial data.
+- API metrics record the movement-list operation with bounded cardinality and
+  no account, movement, operation, amount, or date value as a metric tag.
+- Existing account creation, transfer, notification, migration, and security
+  behavior remains unchanged.
+
+## Ordered slices
+
+1. **Persistence query and read-only application use case.** Extend
+   `MovementRepository` with one pageable account-scoped query whose optional
+   predicates cover `start`, `end`, and `MovementType`. Reuse
+   `AccountRepository` to distinguish an absent account from an empty movement
+   history. Add purpose-specific input, item, and page DTOs under `model.dto`
+   and a `@Transactional(readOnly = true)` listing service that validates the
+   range, enforces the fixed page size and deterministic sort, invokes the
+   repository, and maps results without initializing the lazy Account graph.
+   Unit tests cover default pagination, later pages, every filter combination,
+   ordering, empty content, unknown accounts, invalid ranges, and collaborator
+   non-invocation after validation failure.
+2. **Versioned HTTP contract, mapping, errors, and metrics.** Add the account
+   movement filter and response records under `model.api`, plus a MapStruct
+   mapper under `model.mapper` for API-to-DTO and DTO-to-response conversion.
+   Add a thin movement-list controller under `api`, extend centralized Problem
+   Details translation for query validation and absent accounts, and add
+   `movement.list` to the existing bounded API metrics operations. Unit and
+   isolated MockMvc tests cover the exact response envelope, default values,
+   ISO 8601 parsing, all supported filters, combined filters, empty pages,
+   `400`/`404`, metrics, unauthenticated access, and rejection of unsupported
+   methods without exposing persistence or financial details.
+3. **Mock-free PostgreSQL verification.** Add an opt-in
+   `AccountMovementListingIntegratedFunctionalTest` using the real random-port
+   application, Flyway V1–V3, and a disposable PostgreSQL 17.6 Testcontainer.
+   Create uniquely identifiable accounts and movement fixtures without clearing
+   tables. Verify ownership isolation, more-than-10-item pagination,
+   deterministic order including equal timestamps, both date boundaries,
+   `CREDIT`, `DEBIT`, combined filters, empty results, invalid input, unknown
+   accounts, and unchanged persisted rows after reads.
+4. **Quality, review, and documentation completion.** Run configured quality
+   gates, review scope, query behavior, lazy-loading safety, API exposure,
+   sensitive-data handling, and unnecessary complexity. Apply findings, rerun
+   affected checks, then synchronize EPIC003, the README, and the shared
+   execution report with actual implementation and validation evidence.
+
+## Expected components and documentation
+
+- `src/main/java/.../repository/MovementRepository.java` — one pageable,
+  account-scoped filtered query.
+- `src/main/java/.../service/` — cohesive read-only movement listing use case.
+- `src/main/java/.../model/dto/` — listing input, movement item, and page DTOs.
+- `src/main/java/.../model/api/` — query/filter and response records.
+- `src/main/java/.../model/mapper/` — MapStruct boundary mappings.
+- `src/main/java/.../api/` — thin versioned listing controller and safe error
+  translation integration.
+- `src/main/java/.../metrics/ApiOperation.java` — bounded `movement.list`
+  operation tag.
+- `src/test/unit/java/.../` — service, mapper, controller, metrics, and error
+  scenarios.
+- `src/test/isolated/java/.../` — isolated MVC contract scenarios.
+- `src/test/integrated/java/.../` — mock-free HTTP/PostgreSQL listing scenarios.
+- `docs/epics/EPIC003-account-movement-listing.md`, this plan, the README, and
+  the shared execution report — planned and final public documentation.
+- No Flyway migration, new dependency, entity relationship, RabbitMQ behavior,
+  Gatling simulation, write use case, or additional filter is included.
+
+The repository query, listing service, mapper methods that transform page
+content, controller orchestration, and exception translation will receive
+JavaDoc stating what each boundary does and why it exists. Every application-
+owned record property will have concise property documentation. Every new or
+changed test method will state the behavior it proves and why that scenario
+matters. The fixed page size, `[start, end)` range semantics, deterministic
+ordering, absent-account distinction, and read-only behavior will remain
+documented next to their smallest relevant code boundaries.
+
+## Quality strategy
+
+- `./mvnw -B -ntp clean test` — process-local unit tests.
+- `./mvnw -B -ntp clean verify` — unit plus isolated functional tests and the
+  at-least-90% eligible line-coverage gate without Docker or another external
+  process.
+- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — existing
+  regression suites plus real movement-list HTTP/PostgreSQL scenarios.
+- `docker compose config --quiet` — unchanged local infrastructure validity.
+- Review verifies fixed pagination, deterministic ordering, optional-filter
+  combinations, safe errors, no entity exposure, no N+1/lazy graph loading, no
+  sensitive logging or metric tags, unchanged write behavior, and absence of
+  speculative filters or abstractions.
+- No lint, static-analysis, dependency/security scanner, or standalone schema
+  quality tool is currently configured; the plan does not claim an absent gate.
+
+## Integrated strategy
+
+The integrated suite will reuse the opt-in profile and its guarded disposable
+PostgreSQL Testcontainer. Scenarios will create unique account and movement
+fixtures and scope every assertion to those identifiers. Tests will never
+truncate, bulk-delete, clean Flyway, drop schemas, or connect to the
+transactional development database; the whole disposable container is
+discarded after the suite.
+
+The production controller, mapper, service, repository, JPA mapping, security
+chain, serialization, and Flyway history will run without mocks. RabbitMQ is not
+part of this read-only boundary and no Gatling execution is planned. The local
+container and random-port HTTP server have no shared state, credentials, cost,
+or consequential external effect, so no Workflow 05 authorization pause is
+expected after development authorization.
+
+## Source-control behavior
+
+Development authorization will cover coherent non-destructive commits and
+pushes for the planned slices, quality/review fixes, integrated verification,
+and final documentation. Stage only EPIC003 files and preserve unrelated
+worktree changes. Amend, squash, force-push, pull request creation, merge,
+deployment, and release remain excluded unless separately requested.
+
+## Checkpoint
+
+- Status: planned; awaiting development authorization.
+- Completed work: EPIC003 scope, user stories, decision-impact analysis, and
+  this execution plan.
+- Implementation, tests, integrated execution, review, commits, and pushes:
+  not started.
+- Decision impact: no new BDR, ADR, engineering standard, logical data-model
+  update, Flyway migration, or dependency is required.
+- Expected integrated boundary: local disposable PostgreSQL only; no
+  consequential real-boundary authorization gate is expected.

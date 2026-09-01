@@ -9,6 +9,7 @@ This is the single execution report for all epic execution plans.
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
+| EPIC003 — Account Movement Listing | [Plan](EPIC003-execution-plan.md) | Planned | Awaiting development authorization |
 
 ## Completed foundation work
 
@@ -196,25 +197,69 @@ destination count, consistency access, and cleanup behavior were stated. No
 lint, static-analysis, dependency/security scanner, or standalone
 schema-quality tool is configured.
 
+## Active plan: EPIC003
+
+### Planned scope
+
+Deliver only the read-only
+`GET /api/v1/accounts/{accountId}/movements` endpoint with zero-based,
+fixed-10-item pagination, deterministic newest-first ordering, and optional
+`start`, `end`, and `CREDIT`/`DEBIT` filters. Return a custom API page envelope,
+an empty successful page for an existing account without matches, `404` for an
+unknown account, and safe `400` Problem Details for invalid query input. No
+write behavior, advanced filters, client-selected size/sort, migration,
+dependency, RabbitMQ change, or Gatling scenario is included.
+
+### Delivery order
+
+1. Add the account-scoped pageable repository query, purpose-specific DTOs, and
+   read-only listing service with focused unit tests.
+2. Add MapStruct mappings, API records, the thin versioned controller, safe
+   errors, bounded movement-list metrics, and isolated MVC tests.
+3. Add mock-free HTTP/PostgreSQL pagination and filter scenarios using the
+   guarded disposable integrated environment without clearing tables.
+4. Run quality gates and independent review, apply findings, synchronize
+   documentation, and finalize delivery.
+
+### Decisions and risks
+
+BDR-0002 supplies account scope, the 10-item limit, optional date range, and
+`CREDIT`/`DEBIT` filters. EPIC003 fixes `[start, end)` range semantics,
+zero-based pages, newest-first `createdAt`/`id` ordering, and a custom response
+envelope so persistence and Spring Data types do not leak into the API. Flyway
+V1 and the logical model already support the query; pagination correctness,
+equal-timestamp ordering, lazy-loading behavior, and ownership isolation are
+the material implementation risks. The temporary unauthenticated `/api/v1/**`
+boundary remains unchanged and is unsuitable for untrusted-network exposure.
+
+### Validation and authorization boundaries
+
+Default `test` and `verify` remain infrastructure-independent and enforce the
+90% eligible-line coverage gate. The integrated profile adds real HTTP and
+PostgreSQL evidence for ownership, pagination, ordering, every supported filter
+combination, empty results, errors, and read-only behavior. It uses only a
+guarded disposable local Testcontainer, unique fixtures, and whole-container
+cleanup, so no consequential Workflow 05 pause is expected. RabbitMQ and
+Gatling are outside this read-only feature.
+
 ## Source control
 
-EPIC001 was delivered in coherent non-destructive commits on `feature/ep001`.
-If EPIC002 development is authorized, coherent non-destructive commits and
-pushes on `feature/ep002` are included through review and finalization. Existing
-unrelated `.gitkeep` deletions remain outside EPIC002 commits. Force-push,
-history rewriting, pull requests, merges, deployments, releases, and Gatling
-execution remain excluded unless their respective authorization is explicit.
+EPIC001 and EPIC002 were delivered in coherent non-destructive commits. EPIC003
+planning artifacts remain in the worktree for review. If EPIC003 development is
+authorized, coherent non-destructive commits and pushes for its planned slices,
+quality/review fixes, integrated verification, and finalization are included.
+Unrelated worktree changes remain outside EPIC003 commits. Amend, squash,
+force-push, history rewriting, pull request creation, merge, deployment, and
+release remain excluded unless separately requested.
 
 ## Authorization
 
-Development authorization was granted on 2026-08-31. It covers the planned
-implementation, local quality and disposable integrated tests, review/fix
-loops, documentation, and normal non-destructive commits and pushes. Flyway V3
-and its 7 PostgreSQL 17.6 schema scenarios are complete. Separate Gatling
-authorization was granted on 2026-08-31 for `http://localhost:18080`, the
-`dedicated-load-test` identity, 10 requests/second for 30 seconds per
-simulation, 20 destinations, direct consistency access, and whole-container
-cleanup.
+Historical EPIC001 and EPIC002 development and Gatling authorizations are
+complete. EPIC003 development is not yet authorized. Once granted, development
+authorization covers the approved implementation, normal quality and review
+fix loops, disposable local integrated tests, documentation synchronization,
+and normal non-destructive commits and pushes. No separate Gatling or
+consequential real-boundary authorization is planned for EPIC003.
 
 ## EPIC002 implementation checkpoint
 
@@ -274,3 +319,10 @@ Delivery checkpoints:
 EPIC002 implementation, local verification, authorized load execution,
 subsequent direct-publication simplification, consistency checks, cleanup, and
 documentation are complete.
+
+## EPIC003 development authorization request
+
+Authorize execution of [EPIC003](EPIC003-execution-plan.md) as scoped above,
+including implementation, configured quality gates, review and fixes,
+disposable local integrated tests, documentation finalization, and normal
+non-destructive commits and pushes.

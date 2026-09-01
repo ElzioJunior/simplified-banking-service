@@ -81,10 +81,14 @@ public class CreateTransferService {
             throw new TransferConflictException("The idempotency token has expired.");
         }
 
-        AccountEntity firstLocked = lockAccount(Math.min(requested.sourceAccountId(), requested.destinationAccountId()));
-        AccountEntity secondLocked = lockAccount(Math.max(requested.sourceAccountId(), requested.destinationAccountId()));
+        AccountEntity firstLocked = lockAccount(
+                Math.min(requested.sourceAccountId(), requested.destinationAccountId()));
+        AccountEntity secondLocked = lockAccount(
+                Math.max(requested.sourceAccountId(), requested.destinationAccountId()));
         AccountEntity source = firstLocked.getId().equals(requested.sourceAccountId()) ? firstLocked : secondLocked;
-        AccountEntity destination = firstLocked.getId().equals(requested.destinationAccountId()) ? firstLocked : secondLocked;
+        AccountEntity destination = firstLocked.getId().equals(requested.destinationAccountId())
+                ? firstLocked
+                : secondLocked;
 
         if (source.getBalance().compareTo(requested.amount()) < 0) {
             throw new TransferConflictException("The source account has insufficient funds.");
@@ -146,9 +150,7 @@ public class CreateTransferService {
     }
 
     /** Replays only an identical normalized payload so token reuse cannot change financial intent. */
-    private CompletedTransferDto replay(
-            TransferIdempotencyTokenEntity token,
-            ValidatedTransfer requested) {
+    private CompletedTransferDto replay(TransferIdempotencyTokenEntity token, ValidatedTransfer requested) {
         boolean samePayload = token.getSourceAccountId().equals(requested.sourceAccountId())
                 && token.getDestinationAccountId().equals(requested.destinationAccountId())
                 && token.getAmount().compareTo(requested.amount()) == 0;
@@ -159,10 +161,6 @@ public class CreateTransferService {
                 token.getOperationId(), token.getSourceAccountId(), token.getDestinationAccountId(), token.getAmount());
     }
 
-    private record ValidatedTransfer(
-            UUID token,
-            Long sourceAccountId,
-            Long destinationAccountId,
-            BigDecimal amount) {
+    private record ValidatedTransfer(UUID token, Long sourceAccountId, Long destinationAccountId, BigDecimal amount) {
     }
 }

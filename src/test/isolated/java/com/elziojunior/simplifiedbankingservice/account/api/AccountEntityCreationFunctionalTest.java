@@ -76,8 +76,7 @@ class AccountEntityCreationFunctionalTest {
                 .andExpect(jsonPath("$.balance").value(100.00))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-31T13:45:00Z"));
 
-        verify(createAccountService).create(
-                new CreateAccountDto("Ada Lovelace", new BigDecimal("100")));
+        verify(createAccountService).create(new CreateAccountDto("Ada Lovelace", new BigDecimal("100")));
     }
 
     /** Proves missing, blank, and oversized names fail before application invocation. */
@@ -96,8 +95,7 @@ class AccountEntityCreationFunctionalTest {
     @Test
     void shouldRejectInvalidBalancesWithSafeProblemDetails() throws Exception {
         assertBadRequest("{\"name\":\"Ada\"}", "Invalid request", "The request is invalid.");
-        assertBadRequest("{\"name\":\"Ada\",\"initialBalance\":-0.001}",
-                "Invalid request", "The request is invalid.");
+        assertBadRequest("{\"name\":\"Ada\",\"initialBalance\":-0.001}", "Invalid request", "The request is invalid.");
 
         verify(createAccountService, never()).create(any());
     }
@@ -144,9 +142,7 @@ class AccountEntityCreationFunctionalTest {
     }
 
     private void assertBadRequest(String content, String title, String detail) throws Exception {
-        mockMvc.perform(post("/api/v1/accounts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(content))
+        mockMvc.perform(post("/api/v1/accounts").contentType(MediaType.APPLICATION_JSON).content(content))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400))

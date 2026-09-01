@@ -158,8 +158,7 @@ class AccountEntityCreationIntegratedFunctionalTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
-        assertThat(response.getBody()).isEqualTo(
-                new ErrorResponse(400, title));
+        assertThat(response.getBody()).isEqualTo(new ErrorResponse(400, title));
     }
 
     private int accountCount() {

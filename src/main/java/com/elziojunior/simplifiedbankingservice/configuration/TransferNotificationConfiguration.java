@@ -29,8 +29,7 @@ public class TransferNotificationConfiguration {
     }
 
     @Bean
-    Binding transferNotificationBinding(DirectExchange transferNotificationExchange,
-            Queue transferNotificationQueue) {
+    Binding transferNotificationBinding(DirectExchange transferNotificationExchange, Queue transferNotificationQueue) {
         return BindingBuilder.bind(transferNotificationQueue)
                 .to(transferNotificationExchange)
                 .with(ROUTING_KEY);
@@ -38,7 +37,6 @@ public class TransferNotificationConfiguration {
 
     @Bean
     Jackson2JsonMessageConverter transferNotificationMessageConverter() {
-        return new Jackson2JsonMessageConverter(
-                "com.elziojunior.simplifiedbankingservice.model.dto");
+        return new Jackson2JsonMessageConverter("com.elziojunior.simplifiedbankingservice.model.dto");
     }
 }
