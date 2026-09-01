@@ -32,6 +32,15 @@ O processo de elaboração da solução e entrega segue esta sequência:
 Em conjunto, essas etapas mantêm cada mudança conectada a uma necessidade aprovada, sustentada por evidências objetivas de
 validação e sujeita à supervisão humana antes de ações com consequências relevantes.
 
+### Evidências públicas da entrega
+
+- **Code review:** um agente dedicado revisa as alterações no [PR #7](https://github.com/ElzioJunior/simplified-banking-service/pull/7),
+  [PR #6](https://github.com/ElzioJunior/simplified-banking-service/pull/6) e
+  [PR #5](https://github.com/ElzioJunior/simplified-banking-service/pull/5).
+- 🕒 **Tempo de desenvolvimento do produto:** `14h`, do
+  [primeiro commit `d088b38`](https://github.com/ElzioJunior/simplified-banking-service/commit/d088b38f46346c21892f3d753a24c9509e4b0478)
+  ao [último commit `7ef78f4`](https://github.com/ElzioJunior/simplified-banking-service/commit/7ef78f4c740c722e12de90a8e70bf8dd94824280).
+
 ## Arquitetura
 
 - As decisões de arquitetura e seu histórico estão indexados nos [Architecture Decision Records](docs/adr/README.md).

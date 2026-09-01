@@ -30,6 +30,15 @@ The solution and delivery process follows this sequence:
 Together, these steps keep every change connected to an approved need, supported by objective validation evidence, and subject to
 clear human oversight before consequential actions.
 
+### Public delivery evidence
+
+- **Code review:** a dedicated agent reviews changes in [PR #7](https://github.com/ElzioJunior/simplified-banking-service/pull/7),
+  [PR #6](https://github.com/ElzioJunior/simplified-banking-service/pull/6), and
+  [PR #5](https://github.com/ElzioJunior/simplified-banking-service/pull/5).
+- 🕒 **Product development time:** `14h`, from the
+  [first commit `d088b38`](https://github.com/ElzioJunior/simplified-banking-service/commit/d088b38f46346c21892f3d753a24c9509e4b0478)
+  to the [latest commit `7ef78f4`](https://github.com/ElzioJunior/simplified-banking-service/commit/7ef78f4c740c722e12de90a8e70bf8dd94824280).
+
 ## Architecture
 
 - Architecture decisions and their history are indexed in the [Architecture Decision Records](docs/adr/README.md).
