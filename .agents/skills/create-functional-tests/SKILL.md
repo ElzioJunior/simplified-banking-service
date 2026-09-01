@@ -20,8 +20,10 @@ isolated and reproducible.
    `src/test/integrated/java`.
 2. Identify the smallest important end-to-end/application flow.
 3. Exercise real application wiring where practical.
-4. Isolate external systems using controlled test doubles or ephemeral
-   dependencies.
+4. Isolate external applications and messaging systems with controlled test
+   doubles. Application-owned persistence may use a disposable Testcontainer
+   when migrations, mappings, transactions, constraints, or locking are part
+   of the flow.
 5. Avoid shared mutable/manual environments.
 6. Validate both successful and important failure flows.
 7. Keep fixtures explicit and understandable.
@@ -33,7 +35,10 @@ isolated and reproducible.
 Isolated functional tests for important feature behavior.
 
 ## Validation
-Tests are repeatable locally/CI and do not require manual external preparation.
+Tests are repeatable locally/CI, use only disposable or controlled dependencies,
+and do not require manual external preparation. Database scenarios prove the
+resolved datasource is their exact test-owned instance, never clear tables, and
+discard the whole instance after the suite.
 Every test method documents its scenario and relevance.
 
 ## Stop conditions

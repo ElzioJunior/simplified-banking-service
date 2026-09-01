@@ -32,8 +32,9 @@ deterministic default quality gates.
 5. Define each scenario with actor/input, minimal fixtures, stable expected
    result, observable side effects, resource lifecycle, and deterministic
    safety checks.
-6. Enter through the real public/application boundary named by the scenario;
-   do not call an internal service merely to bypass transport or security.
+6. Enter through the real public or adapter boundary named by the scenario;
+   do not call an internal service merely to bypass a boundary the scenario
+   claims to qualify.
 7. Use production implementations for every boundary explicitly under test.
    Do not mock the behavior whose integration is being qualified.
 8. Use isolated, ephemeral infrastructure when practical and apply real schema

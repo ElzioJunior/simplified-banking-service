@@ -63,9 +63,11 @@ responsibilities are a design finding.
 
 ## Isolated functional tests
 
-- Validate important flows across real application wiring while replacing or
-  isolating external systems.
-- Prefer ephemeral infrastructure or controlled test doubles.
+- Validate important flows across real application wiring while replacing
+  external applications and messaging systems with controlled test doubles.
+- Application-owned infrastructure may remain real when it is material to the
+  flow. PostgreSQL-backed scenarios use a disposable Testcontainer and may
+  therefore require Docker.
 - Do not depend on shared mutable environments or manual preparation.
 - Enter through a meaningful application boundary and assert final business
   outcomes, not only transport success.
@@ -83,9 +85,13 @@ production rules.
 Integrated tests qualify one or more consequential real boundaries and are
 always opt-in. They supplement rather than replace isolated functional tests.
 
-- Keep the integrated suite outside default `test` and `verify` lifecycles.
-- Use the real application entry point and production implementation for the
-  boundary under qualification.
+- Keep the integrated suite outside default `test` and `verify` lifecycles;
+  activate it only through the dedicated profile.
+- Enter through the real public or adapter boundary named by the scenario and
+  use its production implementation.
+- Never mock the boundary under qualification. Omit or control collateral
+  boundaries when doing so keeps the scenario focused without weakening its
+  compatibility claim.
 - Use real schema migrations and isolated infrastructure when persistence is in
   scope.
 - Keep provider details in infrastructure adapters and test harnesses; assert

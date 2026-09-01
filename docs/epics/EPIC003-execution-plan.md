@@ -148,14 +148,18 @@ merge, deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: planned; awaiting development authorization.
+- Status: implementation in progress; development authorized on 2026-09-01.
 - Completed work: EPIC003 scope, approved test-boundary direction,
-  decision-impact analysis, and this execution plan.
-- Implementation, superseding ADR, standards update, test moves, execution,
-  review, commits, and pushes: not started.
+  decision-impact analysis, execution plan, ADR-0031 superseding ADR-0017 and
+  ADR-0018, and aligned testing standard, Workflow 05, and test skills.
+- Remaining work: test-source restructuring, mocked notification boundary,
+  focused RabbitMQ integration scenario, quality execution, review,
+  documentation finalization, commits, and pushes.
 - Decision impact: one superseding ADR and coordinated engineering-standard,
   workflow, skill, Maven, README, and delivery-document updates are required.
 - Product, API, production runtime, business behavior, and logical data model:
   unchanged.
 - Expected integrated boundary: one disposable local RabbitMQ Testcontainer;
   no consequential real-boundary authorization gate is expected.
+- Next action: move PostgreSQL-backed scenarios and their datasource guard into
+  the isolated source set, then adjust Maven lifecycle membership.
