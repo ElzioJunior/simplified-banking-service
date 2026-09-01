@@ -14,9 +14,9 @@ transfer state.
 
 ## Delivery status
 
-Planned. This Epic defines the requested behavior and user stories; no
-production implementation is included yet. Delivery sequencing and validation
-are defined in the [EPIC004 execution plan](EPIC004-execution-plan.md).
+Completed on 2026-09-01. The read-only endpoint, fixed pagination, filters,
+bounded metrics, safe errors, and PostgreSQL-backed verification were delivered
+as defined in the [EPIC004 execution plan](EPIC004-execution-plan.md).
 
 ---
 
@@ -100,19 +100,19 @@ The endpoint remains temporarily unauthenticated under
 
 # Epic Acceptance Criteria
 
-- A client can list movements for one existing account.
-- Only movements belonging to the account in the path are returned.
-- Results are paginated with at most 10 movements per page.
-- Page numbering starts at zero and defaults to the first page.
-- Results are ordered deterministically from newest to oldest.
-- The client may filter by optional `start` and `end` date/time values.
-- The client may filter by `CREDIT` or `DEBIT`.
-- Date/time and type filters may be combined.
-- An empty result returns a successful empty page.
-- An unknown account returns `404 Not Found`.
-- Invalid query parameters return safe Problem Details with `400 Bad Request`.
-- The API does not expose persistence entities directly.
-- The query does not modify account, movement, or transfer data.
+- [x] A client can list movements for one existing account.
+- [x] Only movements belonging to the account in the path are returned.
+- [x] Results are paginated with at most 10 movements per page.
+- [x] Page numbering starts at zero and defaults to the first page.
+- [x] Results are ordered deterministically from newest to oldest.
+- [x] The client may filter by optional `start` and `end` date/time values.
+- [x] The client may filter by `CREDIT` or `DEBIT`.
+- [x] Date/time and type filters may be combined.
+- [x] An empty result returns a successful empty page.
+- [x] An unknown account returns `404 Not Found`.
+- [x] Invalid query parameters return safe Problem Details with `400 Bad Request`.
+- [x] The API does not expose persistence entities directly.
+- [x] The query does not modify account, movement, or transfer data.
 
 ---
 

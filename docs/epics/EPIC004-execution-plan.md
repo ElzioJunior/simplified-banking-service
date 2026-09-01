@@ -153,19 +153,31 @@ so no Workflow 05 authorization pause is expected.
 
 ## Source-control behavior
 
-Development authorization will cover coherent non-destructive commits and
-pushes for the planned slices, quality/review fixes, isolated verification,
-and final documentation. Stage only EPIC004 files and preserve unrelated
-worktree changes. Amend, squash, force-push, pull request creation, merge,
+Development authorization covered coherent non-destructive commits and pushes
+for the planned slices, quality/review fixes, isolated verification, and final
+documentation. Only EPIC004 files were staged; unrelated
+worktree changes were preserved. Amend, squash, force-push, pull request creation, merge,
 deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: planned; awaiting development authorization.
-- Completed work: EPIC004 scope, user stories, decision-impact analysis, and
-  this execution plan.
-- Implementation, tests, isolated execution, review, commits, and pushes:
-  not started.
+- Status: completed on 2026-09-01.
+- Completed work: the account-scoped pageable query, read-only service, DTOs,
+  public API models, MapStruct mapper, controller, safe errors, bounded
+  `movement.list` metrics, unit/MVC/PostgreSQL tests, review fixes, and public
+  documentation.
+- Focused PostgreSQL validation: `./mvnw -B -ntp
+  -Dit.test=com.elziojunior.simplifiedbankingservice.account.AccountMovementListingFunctionalTest
+  verify` passed 69 unit tests and 5 real movement-listing scenarios against a
+  disposable PostgreSQL 17.6 container with no RabbitMQ dependency.
+- Comprehensive validation: `./mvnw -B -ntp clean test` passed 69 unit tests;
+  `./mvnw -B -ntp clean verify` passed 69 unit and 42 isolated functional tests
+  with the coverage gate; `./mvnw -B -ntp clean
+  -Pintegrated-functional-tests verify` additionally passed the existing single
+  RabbitMQ integration scenario.
+- Review corrected stable UUID mismatch classification, separated the public
+  movement enum from persistence, and added movement-specific safe database
+  failure wording and verification. No review finding remains open.
 - Decision impact: no new BDR, ADR, engineering standard, logical data-model
   update, Flyway migration, or dependency is required.
 - Expected integrated boundary: none; PostgreSQL belongs to the isolated
