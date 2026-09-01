@@ -14,25 +14,25 @@ import com.elziojunior.simplifiedbankingservice.api.TransferTokenController;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapper;
-import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
+import com.elziojunior.simplifiedbankingservice.service.TransferTokenService;
 
 class TransferTokenControllerTest {
 
     /** Proves the token adapter maps the generated token and expiry without alteration. */
     @Test
     void shouldMapIssuedToken() {
-        IssueTransferTokenService service = mock(IssueTransferTokenService.class);
+        TransferTokenService service = mock(TransferTokenService.class);
         TransferTokenMapper mapper = mock(TransferTokenMapper.class);
         UUID token = UUID.fromString("00000000-0000-0000-0000-000000000001");
         OffsetDateTime expiresAt = OffsetDateTime.parse("2026-08-31T14:10:00Z");
         IssuedTransferTokenDto issued = new IssuedTransferTokenDto(token, expiresAt);
         TransferTokenResponse expected = new TransferTokenResponse(token, expiresAt);
-        when(service.issue()).thenReturn(issued);
+        when(service.issueTransferToken()).thenReturn(issued);
         when(mapper.toResponse(issued)).thenReturn(expected);
         TransferTokenResponse response = new TransferTokenController(service, mapper).issue();
 
         assertThat(response).isEqualTo(expected);
-        verify(service).issue();
+        verify(service).issueTransferToken();
         verify(mapper).toResponse(issued);
     }
 }

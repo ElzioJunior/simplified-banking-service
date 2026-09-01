@@ -12,8 +12,9 @@ import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDt
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
+import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 
-/** Maps account-movement models at the HTTP-to-application boundary. */
+/** Maps account-movement models across persistence, application, and HTTP boundaries. */
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING, unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface AccountMovementMapper {
 
@@ -28,6 +29,9 @@ public interface AccountMovementMapper {
     default MovementLookbackPeriod toPeriod(String period) {
         return MovementLookbackPeriod.fromApiValue(period == null ? "1d" : period);
     }
+
+    /** Copies the approved persisted movement fields without traversing the account relationship. */
+    MovementItemDto toDto(MovementEntity movement);
 
     /** Converts an application page into the stable public page envelope. */
     AccountMovementPageResponse toResponse(MovementPageDto page);

@@ -86,6 +86,9 @@ Dependencies should generally flow from API/integration boundaries toward applic
 ## Service Layer
 
 - Services coordinate application use cases and business behavior.
+- Name service classes after the cohesive resource or capability they own, not
+  after a single action. Name their public methods after the specific use case,
+  such as `AccountService.createAccount`, so call sites communicate intent.
 - Keep services cohesive and focused on a clear capability.
 - Avoid large service classes that accumulate unrelated use cases.
 - Express business rules with explicit domain language.

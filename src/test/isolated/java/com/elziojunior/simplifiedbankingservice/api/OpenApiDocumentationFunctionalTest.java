@@ -23,10 +23,10 @@ import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapperImpl;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapperImpl;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapperImpl;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapperImpl;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
-import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
-import com.elziojunior.simplifiedbankingservice.service.ListAccountMovementsService;
+import com.elziojunior.simplifiedbankingservice.service.AccountService;
+import com.elziojunior.simplifiedbankingservice.service.TransferService;
+import com.elziojunior.simplifiedbankingservice.service.TransferTokenService;
+import com.elziojunior.simplifiedbankingservice.service.AccountMovementService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springdoc.core.configuration.SpringDocConfiguration;
@@ -36,7 +36,12 @@ import org.springdoc.core.properties.SwaggerUiOAuthProperties;
 import org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration;
 import org.springdoc.webmvc.ui.SwaggerConfig;
 
-@WebMvcTest({AccountController.class, AccountMovementController.class, TransferController.class, TransferTokenController.class})
+@WebMvcTest({
+        AccountController.class,
+        AccountMovementController.class,
+        TransferController.class,
+        TransferTokenController.class
+})
 @ImportAutoConfiguration({SpringDocConfiguration.class, SpringDocWebMvcConfiguration.class, SwaggerConfig.class})
 @EnableConfigurationProperties({
         SpringDocConfigProperties.class,
@@ -63,16 +68,16 @@ class OpenApiDocumentationFunctionalTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private CreateAccountService createAccountService;
+    private AccountService accountService;
 
     @MockitoBean
-    private ListAccountMovementsService listAccountMovementsService;
+    private AccountMovementService accountMovementService;
 
     @MockitoBean
-    private CreateTransferService createTransferService;
+    private TransferService transferService;
 
     @MockitoBean
-    private IssueTransferTokenService issueTransferTokenService;
+    private TransferTokenService transferTokenService;
 
     @MockitoBean
     private ApiMetrics apiMetrics;

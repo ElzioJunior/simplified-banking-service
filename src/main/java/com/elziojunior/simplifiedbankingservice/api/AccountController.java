@@ -7,7 +7,7 @@ import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapper;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
+import com.elziojunior.simplifiedbankingservice.service.AccountService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,11 +22,11 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/accounts")
 public class AccountController implements AccountApi {
 
-    private final CreateAccountService createAccountService;
+    private final AccountService accountService;
     private final AccountMapper accountMapper;
 
-    public AccountController(CreateAccountService createAccountService, AccountMapper accountMapper) {
-        this.createAccountService = createAccountService;
+    public AccountController(AccountService accountService, AccountMapper accountMapper) {
+        this.accountService = accountService;
         this.accountMapper = accountMapper;
     }
 
@@ -42,7 +42,7 @@ public class AccountController implements AccountApi {
     @ObservedApiOperation(ApiOperation.ACCOUNT_CREATE)
     @Override
     public AccountResponse create(@Valid @RequestBody CreateAccountRequest request) {
-        CreatedAccountDto account = createAccountService.create(accountMapper.toDto(request));
+        CreatedAccountDto account = accountService.createAccount(accountMapper.toDto(request));
         return accountMapper.toResponse(account);
     }
 }

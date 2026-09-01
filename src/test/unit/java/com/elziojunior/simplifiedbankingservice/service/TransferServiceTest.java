@@ -39,7 +39,7 @@ import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTokenRepository;
 
 @ExtendWith(MockitoExtension.class)
-class CreateTransferServiceTest {
+final class TransferServiceTest {
 
     private static final UUID TOKEN = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID OPERATION = UUID.fromString("22222222-2222-2222-2222-222222222222");
@@ -52,14 +52,14 @@ class CreateTransferServiceTest {
     @Mock private TransferNotificationAfterCommitScheduler notificationScheduler;
     @Mock private TransferLockTimeoutConfigurer lockTimeoutConfigurer;
 
-    private CreateTransferService service;
+    private TransferService service;
     private TransferIdempotencyTokenEntity token;
 
     @BeforeEach
     void setUp() {
         UuidGenerator uuidGenerator = mock(UuidGenerator.class);
         lenient().when(uuidGenerator.generate()).thenReturn(OPERATION, EVENT);
-        service = new CreateTransferService(
+        service = new TransferService(
                 tokenRepository,
                 accountRepository,
                 movementRepository,
@@ -79,7 +79,7 @@ class CreateTransferServiceTest {
         when(accountRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(destination));
         when(accountRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(source));
 
-        CompletedTransferDto result = service.create(command(20L, 10L, "40.005"));
+        CompletedTransferDto result = service.createTransfer(command(20L, 10L, "40.005"));
 
         assertThat(result).isEqualTo(new CompletedTransferDto(OPERATION, 20L, 10L, new BigDecimal("40.00")));
         verify(source).updateBalance(new BigDecimal("60.00"));
@@ -105,7 +105,7 @@ class CreateTransferServiceTest {
         token.associate(OPERATION, 1L, 2L, new BigDecimal("10.00"), NOW.minusSeconds(1));
         when(tokenRepository.findByTokenForUpdate(TOKEN)).thenReturn(Optional.of(token));
 
-        CompletedTransferDto result = service.create(command(1L, 2L, "10.0"));
+        CompletedTransferDto result = service.createTransfer(command(1L, 2L, "10.0"));
 
         assertThat(result.transferId()).isEqualTo(OPERATION);
         verify(accountRepository, never()).findByIdForUpdate(any());
@@ -119,7 +119,7 @@ class CreateTransferServiceTest {
         token.associate(OPERATION, 1L, 2L, new BigDecimal("10.00"), NOW.minusSeconds(1));
         when(tokenRepository.findByTokenForUpdate(TOKEN)).thenReturn(Optional.of(token));
 
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "11.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "11.00")))
                 .isInstanceOf(TransferConflictException.class);
 
         verify(accountRepository, never()).findByIdForUpdate(any());
@@ -131,7 +131,7 @@ class CreateTransferServiceTest {
         token = new TransferIdempotencyTokenEntity(TOKEN, NOW.minusMinutes(11), NOW);
         when(tokenRepository.findByTokenForUpdate(TOKEN)).thenReturn(Optional.of(token));
 
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "10.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "10.00")))
                 .isInstanceOf(TransferConflictException.class);
 
         verify(accountRepository, never()).findByIdForUpdate(any());
@@ -142,14 +142,14 @@ class CreateTransferServiceTest {
     void shouldRejectUnknownToken() {
         when(tokenRepository.findByTokenForUpdate(TOKEN)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "10.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "10.00")))
                 .isInstanceOf(TransferConflictException.class);
     }
 
     /** Proves same-account transfers are rejected before any repository interaction. */
     @Test
     void shouldRejectSameAccountTransfer() {
-        assertThatThrownBy(() -> service.create(command(1L, 1L, "10.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 1L, "10.00")))
                 .isInstanceOf(TransferConflictException.class);
 
         verify(tokenRepository, never()).findByTokenForUpdate(any());
@@ -158,13 +158,13 @@ class CreateTransferServiceTest {
     /** Proves nonpositive and sub-cent-to-zero monetary values cannot reach token locking. */
     @Test
     void shouldRejectUnsupportedAmounts() {
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "0")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "0")))
                 .isInstanceOf(TransferValidationException.class);
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "0.001")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "0.001")))
                 .isInstanceOf(TransferValidationException.class);
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "-1")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "-1")))
                 .isInstanceOf(TransferValidationException.class);
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "99999999999999999.995")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "99999999999999999.995")))
                 .isInstanceOf(TransferValidationException.class);
 
         verify(tokenRepository, never()).findByTokenForUpdate(any());
@@ -176,7 +176,7 @@ class CreateTransferServiceTest {
         when(tokenRepository.findByTokenForUpdate(TOKEN)).thenReturn(Optional.of(token));
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "10.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "10.00")))
                 .isInstanceOf(TransferNotFoundException.class);
     }
 
@@ -189,7 +189,7 @@ class CreateTransferServiceTest {
         when(accountRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(source));
         when(accountRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.create(command(1L, 2L, "10.00")))
+        assertThatThrownBy(() -> service.createTransfer(command(1L, 2L, "10.00")))
                 .isInstanceOf(TransferConflictException.class);
 
         verify(movementRepository, never()).saveAll(any());

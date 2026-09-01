@@ -17,12 +17,13 @@ import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 
 /** Lists one account's immutable financial history through a bounded read-only query. */
 @Service
-public class ListAccountMovementsService {
+public class AccountMovementService {
 
     private static final int PAGE_SIZE = 10;
     private static final Sort NEWEST_FIRST = Sort.by(
@@ -31,12 +32,17 @@ public class ListAccountMovementsService {
 
     private final AccountRepository accountRepository;
     private final MovementRepository movementRepository;
+    private final AccountMovementMapper accountMovementMapper;
     private final Clock clock;
 
-    public ListAccountMovementsService(
-            AccountRepository accountRepository, MovementRepository movementRepository, Clock clock) {
+    public AccountMovementService(
+            AccountRepository accountRepository,
+            MovementRepository movementRepository,
+            AccountMovementMapper accountMovementMapper,
+            Clock clock) {
         this.accountRepository = accountRepository;
         this.movementRepository = movementRepository;
+        this.accountMovementMapper = accountMovementMapper;
         this.clock = clock;
     }
 
@@ -51,7 +57,7 @@ public class ListAccountMovementsService {
      * @throws AccountMovementNotFoundException when the account does not exist
      */
     @Transactional(readOnly = true)
-    public MovementPageDto list(ListAccountMovementsDto query) {
+    public MovementPageDto listAccountMovements(ListAccountMovementsDto query) {
         validate(query);
         if (!accountRepository.existsById(query.accountId())) {
             throw new AccountMovementNotFoundException("The requested account does not exist.");
@@ -63,7 +69,7 @@ public class ListAccountMovementsService {
         Page<MovementEntity> movements = movementRepository.findPageByAccountAndFilters(
                 query.accountId(), start, end, query.type(), pageRequest);
         List<MovementItemDto> content = movements.getContent().stream()
-                .map(this::toDto)
+                .map(accountMovementMapper::toDto)
                 .toList();
         return new MovementPageDto(
                 content,
@@ -98,13 +104,4 @@ public class ListAccountMovementsService {
         };
     }
 
-    /** Copies approved movement fields into an application result without traversing the account relationship. */
-    private MovementItemDto toDto(MovementEntity movement) {
-        return new MovementItemDto(
-                movement.getId(),
-                movement.getOperationId(),
-                movement.getType(),
-                movement.getAmount(),
-                movement.getCreatedAt());
-    }
 }

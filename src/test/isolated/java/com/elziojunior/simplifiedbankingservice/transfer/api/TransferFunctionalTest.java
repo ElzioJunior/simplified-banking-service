@@ -36,8 +36,8 @@ import com.elziojunior.simplifiedbankingservice.model.dto.IssuedTransferTokenDto
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapperImpl;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferTokenMapperImpl;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
-import com.elziojunior.simplifiedbankingservice.service.IssueTransferTokenService;
+import com.elziojunior.simplifiedbankingservice.service.TransferService;
+import com.elziojunior.simplifiedbankingservice.service.TransferTokenService;
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
@@ -66,10 +66,10 @@ class TransferFunctionalTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private IssueTransferTokenService issueTransferTokenService;
+    private TransferTokenService transferTokenService;
 
     @MockitoBean
-    private CreateTransferService createTransferService;
+    private TransferService transferService;
 
     @Autowired
     private SimpleMeterRegistry meterRegistry;
@@ -82,7 +82,7 @@ class TransferFunctionalTest {
     /** Proves token issuance is public during the temporary authentication exception. */
     @Test
     void shouldIssueTokenWithoutAuthenticationOrCsrf() throws Exception {
-        when(issueTransferTokenService.issue()).thenReturn(new IssuedTransferTokenDto(
+        when(transferTokenService.issueTransferToken()).thenReturn(new IssuedTransferTokenDto(
                 TOKEN, OffsetDateTime.parse("2026-08-31T14:10:00Z")));
 
         mockMvc.perform(post("/api/v1/transfer-tokens"))
@@ -97,7 +97,7 @@ class TransferFunctionalTest {
     @Test
     void shouldCreateTransferWithoutAuthenticationOrCsrf() throws Exception {
         CreateTransferDto input = new CreateTransferDto(TOKEN, 1L, 2L, new BigDecimal("12.345"));
-        when(createTransferService.create(input)).thenReturn(
+        when(transferService.createTransfer(input)).thenReturn(
                 new CompletedTransferDto(TRANSFER_ID, 1L, 2L, new BigDecimal("12.34")));
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -113,7 +113,7 @@ class TransferFunctionalTest {
                 .andExpect(jsonPath("$.destinationAccountId").value(2))
                 .andExpect(jsonPath("$.amount").value(12.34));
 
-        verify(createTransferService).create(input);
+        verify(transferService).createTransfer(input);
         assertRequestMetrics(ApiOperation.TRANSFER_CREATE, "successful", 1);
     }
 
@@ -123,7 +123,7 @@ class TransferFunctionalTest {
         assertTransferProblem(null, "Invalid transfer request", "The Idempotency-Key header is required.", 400);
         assertTransferProblem("not-a-uuid", "Invalid transfer request", "The Idempotency-Key header is invalid.", 400);
 
-        verify(createTransferService, never()).create(any());
+        verify(transferService, never()).createTransfer(any());
         assertRequestMetrics(ApiOperation.TRANSFER_CREATE, "rejected", 2);
     }
 
@@ -139,14 +139,14 @@ class TransferFunctionalTest {
                 .andExpect(jsonPath("$.title").value("Invalid request"))
                 .andExpect(jsonPath("$.detail").value("The request is invalid."));
 
-        verify(createTransferService, never()).create(any());
+        verify(transferService, never()).createTransfer(any());
         assertRequestMetrics(ApiOperation.TRANSFER_CREATE, "rejected", 1);
     }
 
     /** Proves known transfer failures map to stable public statuses without internals. */
     @Test
     void shouldTranslateKnownTransferFailures() throws Exception {
-        when(createTransferService.create(any()))
+        when(transferService.createTransfer(any()))
                 .thenThrow(new TransferNotFoundException("A transfer account does not exist."))
                 .thenThrow(new TransferConflictException("The transfer conflicts with current state."))
                 .thenThrow(new TransientDataAccessResourceException("database detail"));

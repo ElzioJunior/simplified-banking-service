@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.TransferMapper;
-import com.elziojunior.simplifiedbankingservice.service.CreateTransferService;
+import com.elziojunior.simplifiedbankingservice.service.TransferService;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 
@@ -28,11 +28,11 @@ public class TransferController implements TransferApi {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TransferController.class);
 
-    private final CreateTransferService createTransferService;
+    private final TransferService transferService;
     private final TransferMapper transferMapper;
 
-    public TransferController(CreateTransferService createTransferService, TransferMapper transferMapper) {
-        this.createTransferService = createTransferService;
+    public TransferController(TransferService transferService, TransferMapper transferMapper) {
+        this.transferService = transferService;
         this.transferMapper = transferMapper;
     }
 
@@ -43,7 +43,7 @@ public class TransferController implements TransferApi {
     public TransferResponse create(
             @RequestHeader("Idempotency-Key") UUID token,
             @Valid @RequestBody CreateTransferRequest request) {
-        CompletedTransferDto transfer = createTransferService.create(transferMapper.toDto(token, request));
+        CompletedTransferDto transfer = transferService.createTransfer(transferMapper.toDto(token, request));
         LOGGER.info("Transfer request completed with operationId={}", transfer.transferId());
         return transferMapper.toResponse(transfer);
     }

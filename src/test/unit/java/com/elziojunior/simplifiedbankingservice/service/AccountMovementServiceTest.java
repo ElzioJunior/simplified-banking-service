@@ -34,15 +34,17 @@ import org.springframework.data.domain.Sort;
 import com.elziojunior.simplifiedbankingservice.exception.AccountMovementNotFoundException;
 import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 
 @ExtendWith(MockitoExtension.class)
-class ListAccountMovementsServiceTest {
+final class AccountMovementServiceTest {
 
     private static final long ACCOUNT_ID = 41L;
     private static final OffsetDateTime END = OffsetDateTime.parse("2026-03-31T12:00:00Z");
@@ -53,13 +55,17 @@ class ListAccountMovementsServiceTest {
     @Mock
     private MovementRepository movementRepository;
 
-    private ListAccountMovementsService service;
+    @Mock
+    private AccountMovementMapper accountMovementMapper;
+
+    private AccountMovementService service;
 
     @BeforeEach
     void setUp() {
-        service = new ListAccountMovementsService(
+        service = new AccountMovementService(
                 accountRepository,
                 movementRepository,
+                accountMovementMapper,
                 Clock.fixed(Instant.parse("2026-03-31T12:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -69,12 +75,14 @@ class ListAccountMovementsServiceTest {
      */
     @Test
     void shouldReturnDefaultMovementPageInDeterministicOrder() {
-        MovementEntity movement = movement(
+        MovementEntity movement = mock(MovementEntity.class);
+        MovementItemDto mappedMovement = new MovementItemDto(
                 8L,
                 UUID.fromString("00000000-0000-0000-0000-000000000008"),
                 MovementType.CREDIT,
-                "12.34",
+                new BigDecimal("12.34"),
                 END.minusHours(1));
+        when(accountMovementMapper.toDto(movement)).thenReturn(mappedMovement);
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(true);
         when(movementRepository.findPageByAccountAndFilters(
                 org.mockito.ArgumentMatchers.eq(ACCOUNT_ID),
@@ -84,7 +92,7 @@ class ListAccountMovementsServiceTest {
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(movement), PageRequest.of(0, 10), 1));
 
-        MovementPageDto result = service.list(
+        MovementPageDto result = service.listAccountMovements(
                 new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_DAY, null));
 
         assertThat(result.page()).isZero();
@@ -93,11 +101,12 @@ class ListAccountMovementsServiceTest {
         assertThat(result.totalPages()).isOne();
         assertThat(result.content()).singleElement().satisfies(item -> {
             assertThat(item.id()).isEqualTo(8L);
-            assertThat(item.operationId()).isEqualTo(movement.getOperationId());
+            assertThat(item.operationId()).isEqualTo(mappedMovement.operationId());
             assertThat(item.type()).isEqualTo(MovementType.CREDIT);
             assertThat(item.amount()).isEqualByComparingTo("12.34");
             assertThat(item.createdAt()).isEqualTo(END.minusHours(1));
         });
+        verify(accountMovementMapper).toDto(movement);
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(movementRepository).findPageByAccountAndFilters(
                 org.mockito.ArgumentMatchers.eq(ACCOUNT_ID),
@@ -121,10 +130,11 @@ class ListAccountMovementsServiceTest {
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(true);
         PageRequest expectedPage = PageRequest.of(2, 10, Sort.by(
                 Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, expectedStart, END, MovementType.DEBIT, expectedPage))
+        when(movementRepository.findPageByAccountAndFilters(
+                ACCOUNT_ID, expectedStart, END, MovementType.DEBIT, expectedPage))
                 .thenReturn(new PageImpl<>(List.of(), expectedPage, 21));
 
-        MovementPageDto result = service.list(new ListAccountMovementsDto(ACCOUNT_ID, 2, period, MovementType.DEBIT));
+        MovementPageDto result = service.listAccountMovements(new ListAccountMovementsDto(ACCOUNT_ID, 2, period, MovementType.DEBIT));
 
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.content()).isEmpty();
@@ -143,7 +153,7 @@ class ListAccountMovementsServiceTest {
         when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, END.minusWeeks(1), END, null, page))
                 .thenReturn(new PageImpl<>(List.of(), page, 0));
 
-        MovementPageDto result = service.list(
+        MovementPageDto result = service.listAccountMovements(
                 new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_WEEK, null));
 
         assertThat(result.content()).isEmpty();
@@ -156,7 +166,7 @@ class ListAccountMovementsServiceTest {
     void shouldRejectUnknownAccountWithoutQueryingMovements() {
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.list(
+        assertThatThrownBy(() -> service.listAccountMovements(
                 new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_DAY, null)))
                 .isInstanceOf(AccountMovementNotFoundException.class)
                 .hasMessage("The requested account does not exist.");
@@ -171,9 +181,9 @@ class ListAccountMovementsServiceTest {
                 new ListAccountMovementsDto(ACCOUNT_ID, -1, MovementLookbackPeriod.ONE_DAY, null),
                 new ListAccountMovementsDto(ACCOUNT_ID, 0, null, null));
 
-        assertThatThrownBy(() -> service.list(null))
+        assertThatThrownBy(() -> service.listAccountMovements(null))
                 .isInstanceOf(AccountMovementValidationException.class);
-        invalidQueries.forEach(query -> assertThatThrownBy(() -> service.list(query))
+        invalidQueries.forEach(query -> assertThatThrownBy(() -> service.listAccountMovements(query))
                 .isInstanceOf(AccountMovementValidationException.class));
 
         verify(accountRepository, never()).existsById(org.mockito.ArgumentMatchers.any());
@@ -187,14 +197,4 @@ class ListAccountMovementsServiceTest {
                 Arguments.of(MovementLookbackPeriod.ONE_MONTH, END.minusMonths(1)));
     }
 
-    private MovementEntity movement(
-            Long id, UUID operationId, MovementType type, String amount, OffsetDateTime createdAt) {
-        MovementEntity movement = mock(MovementEntity.class);
-        when(movement.getId()).thenReturn(id);
-        when(movement.getOperationId()).thenReturn(operationId);
-        when(movement.getType()).thenReturn(type);
-        when(movement.getAmount()).thenReturn(new BigDecimal(amount));
-        when(movement.getCreatedAt()).thenReturn(createdAt);
-        return movement;
-    }
 }

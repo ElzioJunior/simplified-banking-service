@@ -16,7 +16,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementFilterR
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementPageResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
-import com.elziojunior.simplifiedbankingservice.service.ListAccountMovementsService;
+import com.elziojunior.simplifiedbankingservice.service.AccountMovementService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -28,13 +28,13 @@ public class AccountMovementController implements AccountMovementApi {
 
     private static final Set<String> SUPPORTED_QUERY_PARAMETERS = Set.of("page", "period", "type");
 
-    private final ListAccountMovementsService listAccountMovementsService;
+    private final AccountMovementService accountMovementService;
     private final AccountMovementMapper accountMovementMapper;
 
     public AccountMovementController(
-            ListAccountMovementsService listAccountMovementsService,
+            AccountMovementService accountMovementService,
             AccountMovementMapper accountMovementMapper) {
-        this.listAccountMovementsService = listAccountMovementsService;
+        this.accountMovementService = accountMovementService;
         this.accountMovementMapper = accountMovementMapper;
     }
 
@@ -55,7 +55,8 @@ public class AccountMovementController implements AccountMovementApi {
             @Valid @ModelAttribute AccountMovementFilterRequest filter,
             HttpServletRequest httpRequest) {
         validateQueryParameters(httpRequest);
-        MovementPageDto page = listAccountMovementsService.list(accountMovementMapper.toDto(accountId, filter));
+        MovementPageDto page = accountMovementService.listAccountMovements(
+                accountMovementMapper.toDto(accountId, filter));
         return accountMovementMapper.toResponse(page);
     }
 

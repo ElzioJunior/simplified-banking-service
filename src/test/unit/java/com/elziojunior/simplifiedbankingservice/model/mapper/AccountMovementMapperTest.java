@@ -1,6 +1,10 @@
 package com.elziojunior.simplifiedbankingservice.model.mapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -17,6 +21,7 @@ import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDt
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
+import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 
 class AccountMovementMapperTest {
@@ -40,6 +45,25 @@ class AccountMovementMapperTest {
         assertThat(mapPeriod("1d")).isEqualTo(MovementLookbackPeriod.ONE_DAY);
         assertThat(mapPeriod("1w")).isEqualTo(MovementLookbackPeriod.ONE_WEEK);
         assertThat(mapPeriod("1M")).isEqualTo(MovementLookbackPeriod.ONE_MONTH);
+    }
+
+    /** Proves persisted movement fields map to the application DTO without loading the lazy account relationship. */
+    @Test
+    void shouldMapMovementEntityWithoutTraversingAccount() {
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
+        UUID operationId = UUID.fromString("00000000-0000-0000-0000-000000000042");
+        MovementEntity movement = mock(MovementEntity.class);
+        when(movement.getId()).thenReturn(42L);
+        when(movement.getOperationId()).thenReturn(operationId);
+        when(movement.getType()).thenReturn(MovementType.DEBIT);
+        when(movement.getAmount()).thenReturn(new BigDecimal("10.00"));
+        when(movement.getCreatedAt()).thenReturn(createdAt);
+
+        MovementItemDto result = mapper.toDto(movement);
+
+        assertThat(result).isEqualTo(
+                new MovementItemDto(42L, operationId, MovementType.DEBIT, new BigDecimal("10.00"), createdAt));
+        verify(movement, never()).getAccount();
     }
 
     /** Proves page metadata and movement fields are exposed without leaking an entity or account graph. */

@@ -39,7 +39,7 @@ import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapperImpl;
-import com.elziojunior.simplifiedbankingservice.service.ListAccountMovementsService;
+import com.elziojunior.simplifiedbankingservice.service.AccountMovementService;
 
 import io.micrometer.core.instrument.Timer;
 
@@ -57,7 +57,7 @@ class AccountMovementListingFunctionalTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private ListAccountMovementsService listAccountMovementsService;
+    private AccountMovementService accountMovementService;
 
     @MockitoBean
     private ApiMetrics apiMetrics;
@@ -70,7 +70,7 @@ class AccountMovementListingFunctionalTest {
     void shouldReturnDefaultMovementPageAndRecordMetrics() throws Exception {
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
         UUID operationId = UUID.fromString("00000000-0000-0000-0000-000000000042");
-        when(listAccountMovementsService.list(
+        when(accountMovementService.listAccountMovements(
                 new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, null)))
                 .thenReturn(new MovementPageDto(
                         List.of(new MovementItemDto(
@@ -94,8 +94,9 @@ class AccountMovementListingFunctionalTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1));
 
-        verify(listAccountMovementsService)
-                .list(new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, null));
+        verify(accountMovementService)
+                .listAccountMovements(new ListAccountMovementsDto(
+                        41L, 0, MovementLookbackPeriod.ONE_DAY, null));
         verify(apiMetrics).recordOutcome(ApiOperation.MOVEMENT_LIST, 200, sample);
     }
 
@@ -110,7 +111,8 @@ class AccountMovementListingFunctionalTest {
                 default -> throw new IllegalStateException();
             };
             ListAccountMovementsDto query = new ListAccountMovementsDto(41L, 2, period, MovementType.DEBIT);
-            when(listAccountMovementsService.list(query)).thenReturn(new MovementPageDto(List.of(), 2, 10, 21, 3));
+            when(accountMovementService.listAccountMovements(query))
+                    .thenReturn(new MovementPageDto(List.of(), 2, 10, 21, 3));
 
             mockMvc.perform(get("/api/v1/accounts/41/movements")
                             .param("page", "2")
@@ -119,14 +121,15 @@ class AccountMovementListingFunctionalTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.page").value(2));
 
-            verify(listAccountMovementsService).list(query);
+            verify(accountMovementService).listAccountMovements(query);
         }
     }
 
     /** Proves an existing account with no matches has a normal empty response envelope. */
     @Test
     void shouldReturnEmptyMovementPage() throws Exception {
-        when(listAccountMovementsService.list(any())).thenReturn(new MovementPageDto(List.of(), 0, 10, 0, 0));
+        when(accountMovementService.listAccountMovements(any()))
+                .thenReturn(new MovementPageDto(List.of(), 0, 10, 0, 0));
 
         mockMvc.perform(get("/api/v1/accounts/41/movements"))
                 .andExpect(status().isOk())
@@ -146,7 +149,7 @@ class AccountMovementListingFunctionalTest {
         assertBadRequest("?period=1m", "Invalid request", "The request is invalid.");
         assertBadRequest("?type=UNKNOWN", "Invalid request", "The request is invalid.");
 
-        verify(listAccountMovementsService, never()).list(any());
+        verify(accountMovementService, never()).listAccountMovements(any());
         verify(apiMetrics, org.mockito.Mockito.times(4)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
     }
 
@@ -169,14 +172,14 @@ class AccountMovementListingFunctionalTest {
                 "Invalid movement query",
                 "The movement query contains unsupported parameters.");
 
-        verify(listAccountMovementsService, never()).list(any());
+        verify(accountMovementService, never()).listAccountMovements(any());
         verify(apiMetrics, org.mockito.Mockito.times(3)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
     }
 
     /** Proves application validation and unknown accounts retain safe application-specific Problem Details. */
     @Test
     void shouldTranslateApplicationQueryFailures() throws Exception {
-        when(listAccountMovementsService.list(any()))
+        when(accountMovementService.listAccountMovements(any()))
                 .thenThrow(new AccountMovementValidationException("Movement period is required."))
                 .thenThrow(new AccountMovementNotFoundException("The requested account does not exist."));
 
@@ -197,7 +200,7 @@ class AccountMovementListingFunctionalTest {
     void shouldTranslateMovementDatabaseFailure() throws Exception {
         TransientDataAccessResourceException failure =
                 new TransientDataAccessResourceException("secret database detail");
-        when(listAccountMovementsService.list(any())).thenThrow(failure);
+        when(accountMovementService.listAccountMovements(any())).thenThrow(failure);
 
         mockMvc.perform(get("/api/v1/accounts/41/movements"))
                 .andExpect(status().isServiceUnavailable())
