@@ -4,8 +4,6 @@ import java.time.OffsetDateTime;
 
 import org.springframework.format.annotation.DateTimeFormat;
 
-import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
-
 import jakarta.validation.constraints.Min;
 
 /**
@@ -20,5 +18,5 @@ public record AccountMovementFilterRequest(
         @Min(0) Integer page,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime start,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime end,
-        MovementType type) {
+        AccountMovementType type) {
 }

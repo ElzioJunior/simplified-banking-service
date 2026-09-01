@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
-
 /**
  * Public representation of one financial movement.
  *
@@ -18,7 +16,7 @@ import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 public record AccountMovementResponse(
         Long id,
         UUID operationId,
-        MovementType type,
+        AccountMovementType type,
         BigDecimal amount,
         OffsetDateTime createdAt) {
 }

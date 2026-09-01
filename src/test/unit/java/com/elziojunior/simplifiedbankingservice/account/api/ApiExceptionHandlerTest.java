@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import java.util.UUID;
+
 import com.elziojunior.simplifiedbankingservice.api.ApiExceptionHandler;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiMetrics;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +26,7 @@ import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidat
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
+import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementType;
 
 class ApiExceptionHandlerTest {
 
@@ -61,7 +64,7 @@ class ApiExceptionHandlerTest {
     void shouldMapTransferValidationFailures() {
         ProblemDetail missing = handler.handleTransferValidation(mock(MissingRequestHeaderException.class));
         MethodArgumentTypeMismatchException mismatch = mock(MethodArgumentTypeMismatchException.class);
-        org.mockito.Mockito.when(mismatch.getName()).thenReturn("token");
+        org.mockito.Mockito.doReturn(UUID.class).when(mismatch).getRequiredType();
         ProblemDetail malformed = handler.handleTypeMismatch(mismatch);
         ProblemDetail invalid = handler.handleTransferValidation(new TransferValidationException("Invalid amount."));
 
@@ -79,7 +82,7 @@ class ApiExceptionHandlerTest {
     @Test
     void shouldMapMovementQueryFailures() {
         MethodArgumentTypeMismatchException mismatch = mock(MethodArgumentTypeMismatchException.class);
-        org.mockito.Mockito.when(mismatch.getName()).thenReturn("type");
+        org.mockito.Mockito.doReturn(AccountMovementType.class).when(mismatch).getRequiredType();
 
         ProblemDetail malformed = handler.handleTypeMismatch(mismatch);
         ProblemDetail invalid = handler.handleMovementValidation(

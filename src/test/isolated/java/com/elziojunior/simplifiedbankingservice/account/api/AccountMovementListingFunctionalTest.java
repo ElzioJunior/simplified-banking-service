@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -60,7 +61,10 @@ class AccountMovementListingFunctionalTest {
     @MockitoBean
     private ApiMetrics apiMetrics;
 
-    /** Proves the unauthenticated default request returns the exact fixed-page response and bounded operation metric. */
+    /**
+     * Proves the unauthenticated default request returns the exact fixed-page
+     * response and bounded operation metric.
+     */
     @Test
     void shouldReturnDefaultMovementPageAndRecordMetrics() throws Exception {
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
@@ -157,6 +161,24 @@ class AccountMovementListingFunctionalTest {
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.title").value("Account not found"))
                 .andExpect(jsonPath("$.detail").value("The requested account does not exist."));
+    }
+
+    /** Proves persistence failures use movement-specific safe wording and retain bounded database metrics. */
+    @Test
+    void shouldTranslateMovementDatabaseFailure() throws Exception {
+        TransientDataAccessResourceException failure =
+                new TransientDataAccessResourceException("secret database detail");
+        when(listAccountMovementsService.list(any())).thenThrow(failure);
+
+        mockMvc.perform(get("/api/v1/accounts/41/movements"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.title").value("Movement query temporarily unavailable"))
+                .andExpect(jsonPath("$.detail")
+                        .value("The movements could not be retrieved because persistence is unavailable."));
+
+        verify(apiMetrics).recordDatabaseFailure(ApiOperation.MOVEMENT_LIST, failure);
     }
 
     /** Proves the movement resource is read-only and does not gain an unsupported write method. */

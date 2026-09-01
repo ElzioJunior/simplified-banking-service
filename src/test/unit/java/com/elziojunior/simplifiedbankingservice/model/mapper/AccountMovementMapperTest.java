@@ -12,6 +12,7 @@ import org.mapstruct.factory.Mappers;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementFilterRequest;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementPageResponse;
+import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementType;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
@@ -26,7 +27,8 @@ class AccountMovementMapperTest {
     void shouldMapHttpFiltersToApplicationQuery() {
         OffsetDateTime start = OffsetDateTime.parse("2026-08-01T00:00:00Z");
         OffsetDateTime end = OffsetDateTime.parse("2026-09-01T00:00:00Z");
-        AccountMovementFilterRequest request = new AccountMovementFilterRequest(null, start, end, MovementType.CREDIT);
+        AccountMovementFilterRequest request =
+                new AccountMovementFilterRequest(null, start, end, AccountMovementType.CREDIT);
 
         ListAccountMovementsDto result = mapper.toDto(41L, request);
 
@@ -54,7 +56,7 @@ class AccountMovementMapperTest {
         assertThat(response.content()).singleElement().satisfies(movement -> {
             assertThat(movement.id()).isEqualTo(42L);
             assertThat(movement.operationId()).isEqualTo(operationId);
-            assertThat(movement.type()).isEqualTo(MovementType.DEBIT);
+            assertThat(movement.type()).isEqualTo(AccountMovementType.DEBIT);
             assertThat(movement.amount()).isEqualByComparingTo("10.00");
             assertThat(movement.createdAt()).isEqualTo(createdAt);
         });

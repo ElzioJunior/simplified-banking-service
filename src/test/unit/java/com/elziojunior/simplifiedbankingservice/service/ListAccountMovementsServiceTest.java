@@ -57,7 +57,10 @@ class ListAccountMovementsServiceTest {
         service = new ListAccountMovementsService(accountRepository, movementRepository);
     }
 
-    /** Proves the service enforces page size and deterministic ordering while exposing only approved movement fields. */
+    /**
+     * Proves the service enforces page size and deterministic ordering while
+     * exposing only approved movement fields.
+     */
     @Test
     void shouldReturnDefaultMovementPageInDeterministicOrder() {
         MovementEntity movement = movement(
@@ -101,7 +104,10 @@ class ListAccountMovementsServiceTest {
                 Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
     }
 
-    /** Proves later-page requests and every approved optional-filter combination reach the single repository query unchanged. */
+    /**
+     * Proves later-page requests and every approved optional-filter
+     * combination reach the single repository query unchanged.
+     */
     @ParameterizedTest
     @MethodSource("filters")
     void shouldApplyEveryFilterCombination(OffsetDateTime start, OffsetDateTime end, MovementType type) {
