@@ -4,6 +4,7 @@ package com.elziojunior.simplifiedbankingservice.metrics;
 public enum ApiOperation {
 
     ACCOUNT_CREATE("account.create"),
+    MOVEMENT_LIST("movement.list"),
     TRANSFER_TOKEN_ISSUE("transfer-token.issue"),
     TRANSFER_CREATE("transfer.create");
 

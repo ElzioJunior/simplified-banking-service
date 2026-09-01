@@ -19,6 +19,8 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.elziojunior.simplifiedbankingservice.exception.AccountCreationValidationException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountMovementNotFoundException;
+import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferConflictException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundException;
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
@@ -58,7 +60,9 @@ class ApiExceptionHandlerTest {
     @Test
     void shouldMapTransferValidationFailures() {
         ProblemDetail missing = handler.handleTransferValidation(mock(MissingRequestHeaderException.class));
-        ProblemDetail malformed = handler.handleTransferValidation(mock(MethodArgumentTypeMismatchException.class));
+        MethodArgumentTypeMismatchException mismatch = mock(MethodArgumentTypeMismatchException.class);
+        org.mockito.Mockito.when(mismatch.getName()).thenReturn("token");
+        ProblemDetail malformed = handler.handleTypeMismatch(mismatch);
         ProblemDetail invalid = handler.handleTransferValidation(new TransferValidationException("Invalid amount."));
 
         assertProblem(
@@ -69,6 +73,25 @@ class ApiExceptionHandlerTest {
                 "Invalid transfer request",
                 "The Idempotency-Key header is invalid.");
         assertProblem(invalid, HttpStatus.BAD_REQUEST, "Invalid transfer request", "Invalid amount.");
+    }
+
+    /** Proves invalid movement parameters, ranges, and absent accounts map to safe query-specific errors. */
+    @Test
+    void shouldMapMovementQueryFailures() {
+        MethodArgumentTypeMismatchException mismatch = mock(MethodArgumentTypeMismatchException.class);
+        org.mockito.Mockito.when(mismatch.getName()).thenReturn("type");
+
+        ProblemDetail malformed = handler.handleTypeMismatch(mismatch);
+        ProblemDetail invalid = handler.handleMovementValidation(
+                new AccountMovementValidationException("Start must be before end."));
+        ProblemDetail missing = handler.handleMovementAccountNotFound(
+                new AccountMovementNotFoundException("The requested account does not exist."));
+
+        assertProblem(
+                malformed, HttpStatus.BAD_REQUEST, "Invalid movement query", "The request parameters are invalid.");
+        assertProblem(invalid, HttpStatus.BAD_REQUEST, "Invalid movement query", "Start must be before end.");
+        assertProblem(
+                missing, HttpStatus.NOT_FOUND, "Account not found", "The requested account does not exist.");
     }
 
     /** Proves missing accounts and business conflicts map to their documented statuses. */
