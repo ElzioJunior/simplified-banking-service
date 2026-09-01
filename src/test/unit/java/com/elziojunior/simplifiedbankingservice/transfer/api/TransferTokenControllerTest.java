@@ -29,7 +29,6 @@ class TransferTokenControllerTest {
         TransferTokenResponse expected = new TransferTokenResponse(token, expiresAt);
         when(service.issue()).thenReturn(issued);
         when(mapper.toResponse(issued)).thenReturn(expected);
-
         TransferTokenResponse response = new TransferTokenController(service, mapper).issue();
 
         assertThat(response).isEqualTo(expected);

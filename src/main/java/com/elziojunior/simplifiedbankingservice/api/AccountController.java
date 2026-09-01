@@ -2,6 +2,8 @@ package com.elziojunior.simplifiedbankingservice.api;
 
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
+import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
+import com.elziojunior.simplifiedbankingservice.metrics.ObservedApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapper;
 import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
@@ -36,6 +38,7 @@ public class AccountController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @ObservedApiOperation(ApiOperation.ACCOUNT_CREATE)
     public AccountResponse create(@Valid @RequestBody CreateAccountRequest request) {
         CreatedAccountDto account = createAccountService.create(accountMapper.toDto(request));
         return accountMapper.toResponse(account);

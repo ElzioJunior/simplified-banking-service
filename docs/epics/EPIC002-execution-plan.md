@@ -4,9 +4,9 @@
 
 - Scope is limited to server-issued transfer tokens, account-to-account
   transfers, their debit/credit movements, and the source-account notification
-  intent defined by [EPIC002](EPIC002-account-to-account-transfer.md),
+  event defined by [EPIC002](EPIC002-account-to-account-transfer.md),
   [BDR-0003](../bdr/BDR-0003-account-to-account-transfer-business-rules.md),
-  and [BDR-0004](../bdr/BDR-0004-successful-transfer-notification-policy.md).
+  and [BDR-0005](../bdr/BDR-0005-use-best-effort-transfer-notifications.md).
 - Public contracts are `POST /api/v1/transfer-tokens` and
   `POST /api/v1/transfers`; the latter requires the server-issued token in
   `Idempotency-Key` under [ADR-0026](../adr/ADR-0026-use-server-issued-idempotency-tokens-for-transfers.md).
@@ -27,10 +27,9 @@
   default. The application does not retry whole transfers automatically;
   contention/database failures roll back and use the safe status mapping from
   [ADR-0029](../adr/ADR-0029-handle-transfer-contention-with-bounded-failure.md).
-- One notification outbox record is committed atomically with the transfer.
-  RabbitMQ publication occurs after commit with publisher confirmation and
-  retry of pending records under
-  [ADR-0028](../adr/ADR-0028-use-a-transactional-outbox-for-transfer-notifications.md).
+- Each new completion requests direct best-effort RabbitMQ publication with
+  bounded in-memory retry and no persisted notification state under
+  [ADR-0030](../adr/ADR-0030-publish-transfer-notifications-directly.md).
 - `/api/v1/**` remains temporarily unauthenticated under
   [ADR-0027](../adr/ADR-0027-defer-api-authentication-for-the-initial-scope.md).
   EPIC002 does not design authentication and must preserve the traceable TODO
@@ -40,8 +39,8 @@
   Metrics use bounded outcome/failure tags; account, token, event, and operation
   identifiers must never become metric labels.
 - There are no remaining open EPIC002 decisions. The approved changes require
-  a Flyway V2 migration, logical-model update, RabbitMQ Testcontainers support,
-  and an opt-in Gatling load-test profile.
+  Flyway migrations through V3, logical-model updates, RabbitMQ Testcontainers
+  support, and an opt-in Gatling load-test profile.
 
 ## Acceptance criteria
 
@@ -49,19 +48,19 @@
   minutes after issuance.
 - A valid first use atomically updates both balances, persists exactly one
   debit and credit with the same UUID, associates the normalized payload with
-  the token, and creates exactly one source-account notification intent.
+  the token, and requests one source-account event publication.
 - An identical retry returns the established completed result without another
-  financial or notification effect; expired, unknown, or payload-mismatched
+  financial effect or publication request; expired, unknown, or payload-mismatched
   token use is rejected.
 - Missing accounts, same-account transfer, nonpositive/unsupported amount, and
   insufficient funds make no persistent change.
-- Any failure after mutation begins rolls back balances, movements, token
-  association, and outbox insertion together.
+- Any financial persistence failure after mutation begins rolls back balances,
+  movements, and token association together.
 - Concurrent transfers never overspend, lose updates, create/destroy money, or
   deadlock through inconsistent lock ordering. Timeout/deadlock victims fail
   within the configured bound and can be retried with the same token.
-- RabbitMQ unavailability never changes a completed transfer; the unique outbox
-  intent remains pending and is publishable after recovery.
+- RabbitMQ unavailability never changes a completed transfer; exhausted direct
+  publication is not retained for later recovery.
 - The API uses the documented RFC 9457 `400`, `404`, `409`, and `503` contract
   without exposing balances, payloads, SQL, locks, credentials, or stack data.
 - Gatling reports throughput, latency, error rate, and consistency results for
@@ -73,15 +72,12 @@
 
 ## Ordered slices
 
-1. **Physical persistence foundation.** Add immutable Flyway V2 tables for
-   transfer idempotency tokens and transfer notification outbox records,
-   including UUID identities, 10-minute-expiration support, all-or-none token
-   association constraints, operation/event uniqueness, retention-safe account
-   references, and indexes for unused-token and unpublished-outbox lookup.
-   Extend the existing migration integrated suite to verify metadata,
-   constraints, foreign keys, uniqueness, and V1-to-V2 migration idempotence.
+1. **Physical persistence foundation.** Keep immutable Flyway V2 history for
+   transfer idempotency tokens and add Flyway V3 to remove the superseded
+   notification outbox table. Verify token metadata and the absence of the
+   outbox structure through the real migration suite.
 2. **Persistence mappings and locking boundaries.** Add data-only JPA entities
-   for movements, tokens, and outbox records; add the movement type enum and
+   for movements and tokens; add the movement type enum and
    Spring Data repositories. Extend `AccountEntity` only with the minimal
    balance state mutation needed by the service. Implement repository methods
    that lock a token and then lock each account in ascending ID order with the
@@ -96,7 +92,7 @@
    transactional service that validates and normalizes input, locks the token,
    handles completed identical retries, locks both accounts deterministically,
    checks existence and latest funds, mutates balances, creates the two
-   movements, associates the token, and creates the outbox intent. Focused unit
+   movements, associates the token, and requests direct event publication. Focused unit
    tests cover the complete success path, exact-balance transfer, both
    `HALF_EVEN` ties, positive sub-cent-to-zero rejection, range overflow,
    missing/same accounts, insufficient funds, token states/payload mismatch,
@@ -112,19 +108,18 @@
    and registry tests verify success/replay serialization, required header/body
    validation, `400`/`404`/`409`/`503`, safe details, unsupported methods,
    metrics, and the temporary unauthenticated API boundary.
-6. **Transactional outbox publisher.** Configure a durable RabbitMQ transfer
-   notification exchange, queue, and binding plus publisher confirmations. Add
-   a scheduled publisher that reads pending intents in bounded batches,
-   publishes stable event IDs, and marks success only after confirmation;
-   failure records the attempt and leaves the intent pending. Unit tests cover
-   mapping, confirmation, retryable failure, bounded batches, and the rule that
-   publication never changes transfer state.
+6. **Direct notification publisher.** Configure the RabbitMQ transfer
+   notification exchange, queue, and binding. Add a publisher that sends the
+   event directly with bounded in-memory retry, without polling, confirmation
+   state, or durable recovery. Unit tests cover direct send, retry success,
+   exhausted failure containment, and the rule that publication never changes
+   transfer state.
 7. **Mock-free critical-flow verification.** Add an opt-in
    `TransferIntegratedFunctionalTest` using the real random-port application,
-   Flyway V2, PostgreSQL 17.6, and RabbitMQ 4.1.4 Testcontainers without mocks.
+   Flyway V3, PostgreSQL 17.6, and RabbitMQ 4.1.4 Testcontainers without mocks.
    Reuse the real account-creation API for fixtures. Verify success, exact
    balance, replay and payload mismatch, token expiry, all invalid cases,
-   movement/outbox invariants, forced database rollback, broker outage/recovery,
+   movement invariants, direct event publication,
    same-source competition, 100-debit exhaustion, simultaneous incoming and
    outgoing transfers, cross-transfers, bounded lock timeout, and total-money
    conservation. Use clocks, barriers, futures, database locks, and broker
@@ -141,25 +136,21 @@
 
 ## Expected components and documentation
 
-- `src/main/resources/db/migration/V2__*.sql` — token and outbox schema only;
-  V1 remains unchanged.
-- `src/main/java/.../model/entity/` — movement, idempotency-token, and outbox
-  persistence mappings plus the existing account mapping.
-- `src/main/java/.../repository/` — token/account locking, movement, and outbox
-  persistence boundaries.
-- `src/main/java/.../service/` — token issuance, atomic transfer, and outbox
-  publication orchestration.
+- `src/main/resources/db/migration/V2__*.sql` and `V3__*.sql` — immutable token/outbox history and outbox removal; V1 remains unchanged.
+- `src/main/java/.../model/entity/` — movement and idempotency-token persistence mappings plus the existing account mapping.
+- `src/main/java/.../repository/` — token/account locking and movement persistence boundaries.
+- `src/main/java/.../service/` — token issuance, atomic transfer, and direct notification publication.
 - `src/main/java/.../api/` and `model/api/` — versioned token/transfer
   controllers, transport records, and safe Problem Details mapping.
 - `src/main/java/.../configuration/` — UUID/timeout, RabbitMQ topology,
-  confirmation, and scheduling configuration without business behavior.
+  topology configuration without business behavior.
 - `src/test/unit/java/.../transfer/` — deterministic process-local behavior.
 - `src/test/isolated/java/.../transfer/` — isolated MVC and publisher wiring.
 - `src/test/integrated/java/.../transfer/` — real HTTP/PostgreSQL/RabbitMQ,
-  rollback, idempotency, recovery, and concurrency scenarios.
+  rollback, idempotency, direct publication, and concurrency scenarios.
 - `src/test/gatling/java/.../transfer/` — opt-in load simulations.
-- `docs/database/logical-data-model.md`, ADR-0026, ADR-0028, ADR-0029,
-  BDR-0004, EPIC002, and the shared report — planned contract sources.
+- `docs/database/logical-data-model.md`, ADR-0026, ADR-0029, ADR-0030,
+  BDR-0005, EPIC002, and the shared report — current contract sources.
 - Movement-query endpoints, notification channel consumers, authentication,
   overdrafts, fees, exchange rates, scheduled transfers, and a persisted
   Transfer entity remain out of scope.
@@ -182,13 +173,13 @@ relevant code boundary with links to governing decisions.
   Docker, PostgreSQL, RabbitMQ, or another external process.
 - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — existing
   account/schema regression plus mock-free transfer HTTP/PostgreSQL/RabbitMQ,
-  rollback, recovery, and concurrency scenarios.
+  rollback, direct publication, and concurrency scenarios.
 - `docker compose config --quiet` — unchanged/local infrastructure validity.
 - `./mvnw -B -ntp -Pload-tests gatling:test` — opt-in authorized load suite
   against an explicitly configured dedicated environment.
 - Review verifies business invariants, token replay semantics, deterministic
-  lock order, transaction boundaries, no network call inside the financial
-  transaction, outbox uniqueness, safe errors/logging, sensitive-data
+  lock order, transaction boundaries, the accepted direct best-effort network
+  call, bounded publisher retry, safe errors/logging, sensitive-data
   minimization, bounded metric cardinality, absence of unrelated endpoints,
   and unnecessary complexity.
 - No lint, static-analysis, dependency/security scanner, or standalone schema
@@ -200,9 +191,11 @@ relevant code boundary with links to governing decisions.
 The normal integrated suite uses only disposable local containers and a random
 HTTP port. PostgreSQL and RabbitMQ state is isolated per suite, fixtures enter
 through real public APIs, concurrency is coordinated deterministically, and
-owned rows/queues are cleared between scenarios. This local disposable suite
-has no shared state, credentials, cost, or consequential external effect, so it
-does not require a Workflow 05 authorization pause.
+assertions are scoped to test-owned fixtures. No test clears database tables;
+isolation comes from using a database that is verified as ephemeral and is not
+the transactional development database. This local disposable suite has no
+shared state, credentials, cost, or consequential external effect, so it does
+not require a Workflow 05 authorization pause.
 
 Gatling intentionally generates sustained load against a separately running
 application. Preparation may add the profile, simulations, seed logic, and
@@ -223,28 +216,33 @@ excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: implementation and local verification complete; stopped before the
-  separately authorized Gatling execution
-- Completed slices: 1–7; slice 8 preparation is complete and its load
-  execution/finalization remains pending
-- Documentation prepared: BDR-0004, ADR-0026, ADR-0028, ADR-0029, logical data
+- Status: completed, including separately authorized Gatling execution and
+  finalization
+- Completed slices: 1–8
+- Documentation prepared: BDR-0005, ADR-0026, ADR-0029, ADR-0030, logical data
   model, EPIC002 contract, this plan, and shared execution report
 - Decision impact: approved business, API, persistence, messaging, contention,
   and data-model changes are explicit; no open EPIC002 decision remains
 - Validation evidence:
   - `./mvnw -B -ntp clean -Pintegrated-functional-tests -Dit.test=DatabaseMigrationIntegratedFunctionalTest verify`
-    — 7 PostgreSQL 17.6 migration/schema scenarios passed at Flyway version 2
-  - `./mvnw -B -ntp clean verify` — 40 unit tests, 12 isolated MVC tests, and
+    — 7 PostgreSQL 17.6 migration/schema scenarios passed at Flyway version 3
+  - `./mvnw -B -ntp verify` — 43 unit tests, 12 isolated MVC tests, and
     the 90% eligible-line coverage gate passed
-  - `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — 20 real
+  - `./mvnw -B -ntp -Pintegrated-functional-tests verify` — 18 real
     transfer, account-regression, Flyway, PostgreSQL 17.6, and RabbitMQ 4.1.4
     scenarios passed
-  - `./mvnw -B -ntp -Pload-tests -DskipTests test-compile` — both Gatling
-    simulations compiled; no load was executed
+  - `DistributedTransferSimulation` — 300/300 successful requests at 10
+    requests/second for 30 seconds, 14 ms p95, zero failures, and conserved
+    total money
+  - `HotSourceTransferSimulation` — 300/300 successful requests at 10
+    requests/second for 30 seconds across 20 destinations, 9 ms p95, zero
+    failures, and conserved total money
+  - load environment — disposable application on `http://localhost:18080`,
+    PostgreSQL 17.6 on port 15432, and RabbitMQ 4.1.4 on port 5673; whole
+    containers were discarded after execution and no table was cleared
   - `docker compose config --quiet` and `git diff --check` passed
-- Review: no unresolved BLOCKER or HIGH issue; timeout, metric classification,
-  rollback, recovery, cross-transfer, and 100-request contention findings were
-  applied and revalidated
+- Review: the original delivery review had no unresolved BLOCKER or HIGH issue;
+  the later direct-publication simplification was covered by updated unit and
+  integrated verification
 - Delivery commits: `3ec5035`, `ebad351`, and `26d9879`
-- Next action: request explicit authorization for the exact dedicated Gatling
-  target, rate, duration, consistency access, and cleanup before running it
+- Next action: none; EPIC002 lifecycle is complete

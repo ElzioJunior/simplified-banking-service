@@ -30,8 +30,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "transfer.notifications.publisher.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountEntityCreationIntegratedFunctionalTest {
 
     @Container
@@ -159,8 +158,7 @@ class AccountEntityCreationIntegratedFunctionalTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
-        assertThat(response.getBody()).isEqualTo(
-                new ErrorResponse(400, title));
+        assertThat(response.getBody()).isEqualTo(new ErrorResponse(400, title));
     }
 
     private int accountCount() {

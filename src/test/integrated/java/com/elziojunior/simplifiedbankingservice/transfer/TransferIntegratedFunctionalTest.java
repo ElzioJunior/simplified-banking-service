@@ -35,7 +35,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -46,7 +45,6 @@ import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
-import com.elziojunior.simplifiedbankingservice.service.TransferNotificationOutboxPublisher;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 import javax.sql.DataSource;
@@ -55,9 +53,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "transfer.notifications.publisher.fixed-delay-ms=100",
-        "transfer.notifications.publisher.confirm-timeout-ms=500",
-        "spring.rabbitmq.connection-timeout=500ms",
         "spring.jpa.properties.jakarta.persistence.lock.timeout=500"
 })
 class TransferIntegratedFunctionalTest {
@@ -78,9 +73,6 @@ class TransferIntegratedFunctionalTest {
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
-
-    @Autowired
-    private TransferNotificationOutboxPublisher outboxPublisher;
 
     @Autowired
     private DataSource dataSource;
@@ -110,14 +102,10 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(source)).isEqualByComparingTo("87.66");
         assertThat(balance(destination)).isEqualByComparingTo("22.34");
         assertThat(movementCount(body.transferId())).isEqualTo(2);
-        assertThat(outboxCount(body.transferId())).isOne();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM transfer_idempotency_tokens WHERE token = ? AND used_at IS NOT NULL",
                 Integer.class, token)).isOne();
 
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
-                "SELECT published_at FROM transfer_notification_outbox WHERE operation_id = ?",
-                OffsetDateTime.class, body.transferId())).isNotNull());
         TransferCompletedNotification event = await().atMost(Duration.ofSeconds(5)).until(
                 () -> receiveNotification(body.transferId()), value -> value != null);
         assertThat(event.operationId()).isEqualTo(body.transferId());
@@ -142,7 +130,6 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(source)).isEqualByComparingTo("75.00");
         assertThat(balance(destination)).isEqualByComparingTo("25.00");
         assertThat(movementCount(first.transferId())).isEqualTo(2);
-        assertThat(outboxCount(first.transferId())).isOne();
     }
 
     /** Proves invalid token, account, balance, and same-account cases leave no financial history. */
@@ -173,7 +160,6 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
         assertThat(movementCountForAccount(source)).isZero();
         assertThat(movementCountForAccount(destination)).isZero();
-        assertThat(outboxCountForRecipient(source)).isZero();
     }
 
     /** Proves competing debits serialize without overdraft and conserve total money. */
@@ -203,55 +189,7 @@ class TransferIntegratedFunctionalTest {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         assertThat(balance(source).add(destinationTotal)).isEqualByComparingTo("50.00");
         assertThat(movementCountForAccount(source)).isEqualTo(50);
-        assertThat(outboxCountForRecipient(source)).isEqualTo(50);
         assertThat(destinations).hasSize(100);
-    }
-
-    /** Proves broker outage cannot roll back money and pending intent publishes after recovery. */
-    @Test
-    void shouldRecoverPendingNotificationAfterBrokerOutage() {
-        long source = createAccount("Source", "20.00");
-        long destination = createAccount("Destination", "0.00");
-        var docker = DockerClientFactory.instance().client();
-        Future<?> publication;
-        try (var executor = Executors.newSingleThreadExecutor()) {
-            docker.pauseContainerCmd(RABBITMQ.getContainerId()).exec();
-            try {
-                ResponseEntity<TransferResponse> response = transfer(issueToken(), source, destination, "5.00");
-
-                assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-                assertThat(balance(source)).isEqualByComparingTo("15.00");
-                assertThat(balance(destination)).isEqualByComparingTo("5.00");
-                CountDownLatch publisherStarted = new CountDownLatch(1);
-                publication = executor.submit(() -> {
-                    publisherStarted.countDown();
-                    outboxPublisher.publishPending();
-                });
-                assertThat(publisherStarted.await(1, TimeUnit.SECONDS)).isTrue();
-                assertThat(jdbcTemplate.queryForObject(
-                        "SELECT published_at FROM transfer_notification_outbox WHERE recipient_account_id = ?",
-                        OffsetDateTime.class,
-                        source)).isNull();
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(exception);
-            } finally {
-                docker.unpauseContainerCmd(RABBITMQ.getContainerId()).exec();
-            }
-            try {
-                publication.get(10, TimeUnit.SECONDS);
-            } catch (Exception exception) {
-                throw new IllegalStateException(exception);
-            }
-        }
-
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(jdbcTemplate.queryForObject(
-                "SELECT published_at FROM transfer_notification_outbox WHERE recipient_account_id = ?",
-                OffsetDateTime.class,
-                source)).isNotNull());
-        assertThat(outboxCountForRecipient(source)).isOne();
-        assertThat(movementCountForAccount(source)).isOne();
-        assertThat(movementCountForAccount(destination)).isOne();
     }
 
     /** Proves a contended account fails within the configured bound and rolls back token use. */
@@ -261,8 +199,8 @@ class TransferIntegratedFunctionalTest {
         long destination = createAccount("Destination", "0.00");
         UUID token = issueToken();
 
-        try (Connection connection = dataSource.getConnection();
-                PreparedStatement lock = connection.prepareStatement("SELECT id FROM accounts WHERE id = ? FOR UPDATE")) {
+        try (Connection connection = dataSource.getConnection(); PreparedStatement lock = connection.prepareStatement(
+                "SELECT id FROM accounts WHERE id = ? FOR UPDATE")) {
             connection.setAutoCommit(false);
             lock.setLong(1, source);
             lock.executeQuery();
@@ -278,43 +216,14 @@ class TransferIntegratedFunctionalTest {
                     OffsetDateTime.class, token)).isNull();
             assertThat(movementCountForAccount(source)).isZero();
             assertThat(movementCountForAccount(destination)).isZero();
-            assertThat(outboxCountForRecipient(source)).isZero();
-            assertThat(meterRegistry.counter("banking.transfer.lock.contention").count()).isPositive();
-            assertThat(meterRegistry.counter("banking.transfer.timeouts").count()).isPositive();
+            assertThat(meterRegistry.counter(
+                    "banking.api.lock.contention", "operation", "transfer.create").count()).isPositive();
+            assertThat(meterRegistry.counter(
+                    "banking.api.timeouts", "operation", "transfer.create").count()).isPositive();
             connection.rollback();
         }
         assertThat(balance(source)).isEqualByComparingTo("10.00");
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
-    }
-
-    /** Proves a late outbox persistence failure rolls back balances, movements, and token association together. */
-    @Test
-    void shouldRollbackEveryEffectWhenLatePersistenceFails() {
-        long source = createAccount("Source", "10.00");
-        long destination = createAccount("Destination", "0.00");
-        UUID token = issueToken();
-        jdbcTemplate.execute("""
-                ALTER TABLE transfer_notification_outbox
-                ADD CONSTRAINT test_reject_outbox_insert CHECK (false)
-                """);
-        try {
-            assertThat(transfer(token, source, destination, "3.00").getStatusCode())
-                    .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-        } finally {
-            jdbcTemplate.execute("""
-                    ALTER TABLE transfer_notification_outbox
-                    DROP CONSTRAINT test_reject_outbox_insert
-                    """);
-        }
-
-        assertThat(balance(source)).isEqualByComparingTo("10.00");
-        assertThat(balance(destination)).isEqualByComparingTo("0.00");
-        assertThat(movementCountForAccount(source)).isZero();
-        assertThat(movementCountForAccount(destination)).isZero();
-        assertThat(outboxCountForRecipient(source)).isZero();
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT used_at FROM transfer_idempotency_tokens WHERE token = ?",
-                OffsetDateTime.class, token)).isNull();
     }
 
     /** Proves opposite-direction transfers share ascending lock order and complete without deadlock. */
@@ -342,8 +251,6 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(second)).isEqualByComparingTo("20.00");
         assertThat(movementCountForAccount(first)).isEqualTo(2);
         assertThat(movementCountForAccount(second)).isEqualTo(2);
-        assertThat(outboxCountForRecipient(first)).isOne();
-        assertThat(outboxCountForRecipient(second)).isOne();
     }
 
     private Callable<Integer> coordinatedTransfer(
@@ -380,8 +287,7 @@ class TransferIntegratedFunctionalTest {
         return response.getBody().token();
     }
 
-    private ResponseEntity<TransferResponse> transfer(
-            UUID token, long source, long destination, String amount) {
+    private ResponseEntity<TransferResponse> transfer(UUID token, long source, long destination, String amount) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Idempotency-Key", token.toString());
@@ -403,23 +309,7 @@ class TransferIntegratedFunctionalTest {
 
     private int movementCountForAccount(long accountId) {
         return jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM movements WHERE account_id = ?",
-                Integer.class,
-                accountId);
-    }
-
-    private int outboxCount(UUID operationId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM transfer_notification_outbox WHERE operation_id = ?",
-                Integer.class,
-                operationId);
-    }
-
-    private int outboxCountForRecipient(long accountId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM transfer_notification_outbox WHERE recipient_account_id = ?",
-                Integer.class,
-                accountId);
+                "SELECT count(*) FROM movements WHERE account_id = ?", Integer.class, accountId);
     }
 
     /** Consumes queued test notifications until it finds the event owned by the current fixture. */

@@ -33,8 +33,7 @@ class ApiMapperTest {
 
         assertThat(accountMapper.toDto(new CreateAccountRequest("Ada", new BigDecimal("12.345"))))
                 .isEqualTo(new CreateAccountDto("Ada", new BigDecimal("12.345")));
-        assertThat(accountMapper.toResponse(
-                new CreatedAccountDto(7L, "Ada", new BigDecimal("12.34"), createdAt)))
+        assertThat(accountMapper.toResponse(new CreatedAccountDto(7L, "Ada", new BigDecimal("12.34"), createdAt)))
                 .isEqualTo(new AccountResponse(7L, "Ada", new BigDecimal("12.34"), createdAt));
     }
 
@@ -44,13 +43,10 @@ class ApiMapperTest {
         UUID token = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID transferId = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-        assertThat(transferMapper.toDto(
-                token, new CreateTransferRequest(1L, 2L, new BigDecimal("12.345"))))
+        assertThat(transferMapper.toDto(token, new CreateTransferRequest(1L, 2L, new BigDecimal("12.345"))))
                 .isEqualTo(new CreateTransferDto(token, 1L, 2L, new BigDecimal("12.345")));
-        assertThat(transferMapper.toResponse(
-                new CompletedTransferDto(transferId, 1L, 2L, new BigDecimal("12.34"))))
-                .isEqualTo(new TransferResponse(
-                        transferId, "COMPLETED", 1L, 2L, new BigDecimal("12.34")));
+        assertThat(transferMapper.toResponse(new CompletedTransferDto(transferId, 1L, 2L, new BigDecimal("12.34"))))
+                .isEqualTo(new TransferResponse(transferId, "COMPLETED", 1L, 2L, new BigDecimal("12.34")));
     }
 
     /** Proves issued-token data is exposed through the public API without transformation loss. */
