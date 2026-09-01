@@ -1,7 +1,10 @@
 package com.elziojunior.simplifiedbankingservice.transfer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -20,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -32,38 +34,34 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.mockito.ArgumentCaptor;
 
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateTransferRequest;
-import com.elziojunior.simplifiedbankingservice.configuration.TransferNotificationConfiguration;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.TransferTokenResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
+import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 import javax.sql.DataSource;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @Testcontainers
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "spring.jpa.properties.jakarta.persistence.lock.timeout=500"
+        "spring.jpa.properties.jakarta.persistence.lock.timeout=500",
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
 })
-class TransferIntegratedFunctionalTest {
+class TransferFunctionalTest {
 
     @Container
     @ServiceConnection
     private static final PostgreSQLContainer<?> POSTGRESQL = new PostgreSQLContainer<>("postgres:17.6-alpine");
-
-    @Container
-    @ServiceConnection
-    private static final RabbitMQContainer RABBITMQ = new RabbitMQContainer("rabbitmq:4.1.4-management-alpine");
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -72,13 +70,13 @@ class TransferIntegratedFunctionalTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private RabbitTemplate rabbitTemplate;
-
-    @Autowired
     private DataSource dataSource;
 
     @Autowired
     private MeterRegistry meterRegistry;
+
+    @MockitoBean
+    private TransferNotificationPublisher notificationPublisher;
 
     /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach
@@ -86,7 +84,7 @@ class TransferIntegratedFunctionalTest {
         EphemeralPostgresGuard.verify(dataSource, POSTGRESQL);
     }
 
-    /** Proves the real HTTP/PostgreSQL/RabbitMQ success path and all atomic financial effects. */
+    /** Proves the HTTP/PostgreSQL success path commits atomically and requests one exact notification. */
     @Test
     void shouldCommitTransferAndPublishOneSourceNotification() {
         long source = createAccount("Source", "100.00");
@@ -106,11 +104,18 @@ class TransferIntegratedFunctionalTest {
                 "SELECT count(*) FROM transfer_idempotency_tokens WHERE token = ? AND used_at IS NOT NULL",
                 Integer.class, token)).isOne();
 
-        TransferCompletedNotification event = await().atMost(Duration.ofSeconds(5)).until(
-                () -> receiveNotification(body.transferId()), value -> value != null);
+        ArgumentCaptor<TransferCompletedNotification> notification =
+                ArgumentCaptor.forClass(TransferCompletedNotification.class);
+        verify(notificationPublisher).publish(notification.capture());
+        TransferCompletedNotification event = notification.getValue();
+        OffsetDateTime usedAt = jdbcTemplate.queryForObject(
+                "SELECT used_at FROM transfer_idempotency_tokens WHERE token = ?", OffsetDateTime.class, token);
+        assertThat(event.eventId()).isNotNull().isNotEqualTo(body.transferId());
         assertThat(event.operationId()).isEqualTo(body.transferId());
         assertThat(event.recipientAccountId()).isEqualTo(source);
+        assertThat(event.eventType()).isEqualTo(TransferCompletedNotification.TRANSFER_COMPLETED);
         assertThat(event.amount()).isEqualByComparingTo("12.34");
+        assertThat(event.occurredAt()).isEqualTo(usedAt);
     }
 
     /** Proves identical retries replay while payload reuse is rejected without new effects. */
@@ -130,6 +135,10 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(source)).isEqualByComparingTo("75.00");
         assertThat(balance(destination)).isEqualByComparingTo("25.00");
         assertThat(movementCount(first.transferId())).isEqualTo(2);
+        ArgumentCaptor<TransferCompletedNotification> notification =
+                ArgumentCaptor.forClass(TransferCompletedNotification.class);
+        verify(notificationPublisher, times(1)).publish(notification.capture());
+        assertThat(notification.getValue().operationId()).isEqualTo(first.transferId());
     }
 
     /** Proves invalid token, account, balance, and same-account cases leave no financial history. */
@@ -160,6 +169,7 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
         assertThat(movementCountForAccount(source)).isZero();
         assertThat(movementCountForAccount(destination)).isZero();
+        verifyNoInteractions(notificationPublisher);
     }
 
     /** Proves competing debits serialize without overdraft and conserve total money. */
@@ -190,6 +200,7 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(source).add(destinationTotal)).isEqualByComparingTo("50.00");
         assertThat(movementCountForAccount(source)).isEqualTo(50);
         assertThat(destinations).hasSize(100);
+        verify(notificationPublisher, times(50)).publish(any(TransferCompletedNotification.class));
     }
 
     /** Proves a contended account fails within the configured bound and rolls back token use. */
@@ -224,6 +235,7 @@ class TransferIntegratedFunctionalTest {
         }
         assertThat(balance(source)).isEqualByComparingTo("10.00");
         assertThat(balance(destination)).isEqualByComparingTo("0.00");
+        verifyNoInteractions(notificationPublisher);
     }
 
     /** Proves opposite-direction transfers share ascending lock order and complete without deadlock. */
@@ -251,6 +263,7 @@ class TransferIntegratedFunctionalTest {
         assertThat(balance(second)).isEqualByComparingTo("20.00");
         assertThat(movementCountForAccount(first)).isEqualTo(2);
         assertThat(movementCountForAccount(second)).isEqualTo(2);
+        verify(notificationPublisher, times(2)).publish(any(TransferCompletedNotification.class));
     }
 
     private Callable<Integer> coordinatedTransfer(
@@ -312,15 +325,4 @@ class TransferIntegratedFunctionalTest {
                 "SELECT count(*) FROM movements WHERE account_id = ?", Integer.class, accountId);
     }
 
-    /** Consumes queued test notifications until it finds the event owned by the current fixture. */
-    private TransferCompletedNotification receiveNotification(UUID operationId) {
-        Object received;
-        while ((received = rabbitTemplate.receiveAndConvert(TransferNotificationConfiguration.QUEUE)) != null) {
-            if (received instanceof TransferCompletedNotification notification
-                    && notification.operationId().equals(operationId)) {
-                return notification;
-            }
-        }
-        return null;
-    }
 }

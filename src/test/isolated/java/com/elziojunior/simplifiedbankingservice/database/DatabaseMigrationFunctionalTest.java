@@ -18,15 +18,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
+import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class DatabaseMigrationIntegratedFunctionalTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties =
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration")
+class DatabaseMigrationFunctionalTest {
 
     @Container
     @ServiceConnection
@@ -40,6 +43,9 @@ class DatabaseMigrationIntegratedFunctionalTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockitoBean
+    private TransferNotificationPublisher notificationPublisher;
 
     /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach

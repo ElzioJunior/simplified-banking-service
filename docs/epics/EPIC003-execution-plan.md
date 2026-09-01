@@ -151,15 +151,28 @@ merge, deployment, and release remain excluded unless separately requested.
 - Status: implementation in progress; development authorized on 2026-09-01.
 - Completed work: EPIC003 scope, approved test-boundary direction,
   decision-impact analysis, execution plan, ADR-0031 superseding ADR-0017 and
-  ADR-0018, and aligned testing standard, Workflow 05, and test skills.
-- Remaining work: test-source restructuring, mocked notification boundary,
-  focused RabbitMQ integration scenario, quality execution, review,
-  documentation finalization, commits, and pushes.
+  ADR-0018, aligned testing standard, Workflow 05, and test skills, PostgreSQL
+  suite migration into `src/test/isolated/java`, and mocked publisher
+  verification for successful, replayed, rejected, contended, and concurrent
+  transfer flows.
+- Focused validation: `./mvnw -B -ntp
+  -Dit.test=AccountEntityCreationFunctionalTest,DatabaseMigrationFunctionalTest,TransferFunctionalTest
+  verify` passed 54 unit tests and 30 selected isolated scenarios against three
+  disposable PostgreSQL 17.6 containers; no RabbitMQ connection was configured
+  or attempted, and the coverage gate passed.
+- Focused RabbitMQ validation: `./mvnw -B -ntp
+  -Pintegrated-functional-tests
+  -Dit.test=TransferNotificationPublisherIntegratedFunctionalTest verify`
+  passed 54 unit tests and the single integrated scenario against one
+  disposable RabbitMQ 4.1.4 broker with no PostgreSQL container. Maven tag
+  filters kept the integrated scenario out of the isolated execution.
+- Remaining work: comprehensive quality execution, review, documentation
+  finalization, commits, and pushes.
 - Decision impact: one superseding ADR and coordinated engineering-standard,
   workflow, skill, Maven, README, and delivery-document updates are required.
 - Product, API, production runtime, business behavior, and logical data model:
   unchanged.
 - Expected integrated boundary: one disposable local RabbitMQ Testcontainer;
   no consequential real-boundary authorization gate is expected.
-- Next action: move PostgreSQL-backed scenarios and their datasource guard into
-  the isolated source set, then adjust Maven lifecycle membership.
+- Next action: run the complete default and opt-in lifecycles, then perform the
+  independent review and final documentation synchronization.

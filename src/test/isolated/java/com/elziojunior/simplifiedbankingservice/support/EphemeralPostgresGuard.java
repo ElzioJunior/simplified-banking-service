@@ -7,7 +7,7 @@ import javax.sql.DataSource;
 
 import org.testcontainers.containers.PostgreSQLContainer;
 
-/** Prevents integrated tests from using a datasource outside their disposable PostgreSQL container. */
+/** Prevents functional tests from using a datasource outside their disposable PostgreSQL container. */
 public final class EphemeralPostgresGuard {
 
     private EphemeralPostgresGuard() {
@@ -19,7 +19,7 @@ public final class EphemeralPostgresGuard {
      */
     public static void verify(DataSource dataSource, PostgreSQLContainer<?> container) {
         if (!container.isRunning()) {
-            throw new IllegalStateException("The integrated-test PostgreSQL container is not running.");
+            throw new IllegalStateException("The functional-test PostgreSQL container is not running.");
         }
 
         try (Connection connection = dataSource.getConnection()) {
@@ -28,10 +28,10 @@ public final class EphemeralPostgresGuard {
             boolean expectedConnection = actualUrl.equals(expectedUrl) || actualUrl.startsWith(expectedUrl + "?");
             if (!expectedConnection || !container.getDatabaseName().equals(connection.getCatalog())) {
                 throw new IllegalStateException(
-                        "Integrated tests refused a datasource outside their disposable PostgreSQL container.");
+                        "Functional tests refused a datasource outside their disposable PostgreSQL container.");
             }
         } catch (SQLException exception) {
-            throw new IllegalStateException("Integrated-test datasource isolation could not be verified.", exception);
+            throw new IllegalStateException("Functional-test datasource isolation could not be verified.", exception);
         }
     }
 }

@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -28,10 +29,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import com.elziojunior.simplifiedbankingservice.model.api.AccountResponse;
 import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
+import com.elziojunior.simplifiedbankingservice.service.TransferNotificationPublisher;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class AccountEntityCreationIntegratedFunctionalTest {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties =
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration")
+class AccountEntityCreationFunctionalTest {
 
     @Container
     @ServiceConnection
@@ -45,6 +48,9 @@ class AccountEntityCreationIntegratedFunctionalTest {
 
     @Autowired
     private DataSource dataSource;
+
+    @MockitoBean
+    private TransferNotificationPublisher notificationPublisher;
 
     /** Proves every scenario is connected only to its disposable PostgreSQL Testcontainer. */
     @BeforeEach
