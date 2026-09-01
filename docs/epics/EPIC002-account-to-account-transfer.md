@@ -13,7 +13,7 @@ Implement a REST API for transferring funds between bank accounts while ensuring
 - Protection against race conditions
 - Full rollback in case of failure
 - Retry safety through server-issued idempotency tokens
-- Durable asynchronous notification intent for the source account holder
+- Best-effort RabbitMQ notification event for the source account holder
 
 A transfer must be handled as a single transactional operation:
 
@@ -91,7 +91,7 @@ Idempotency-Key: 4bc9a5ab-6bb8-4c45-b8ca-b15cae27e722
 
 Reusing the same token with the same normalized payload returns the established
 successful response without another debit, credit, movement pair, or
-notification intent. Reusing it for another payload is rejected.
+publication request. Reusing it for another payload is rejected.
 
 ### Error contract
 
@@ -121,10 +121,10 @@ Errors use safe RFC 9457 Problem Details:
 - A server-issued idempotency token must be required for every transfer.
 - An identical retry with the same token must not duplicate financial effects.
 - A token must not authorize another payload and expires after 10 minutes.
-- A successful transfer must durably create exactly one asynchronous
-  notification intent for the source account holder.
+- A newly completed transfer must request one best-effort notification event
+  publication for the source account holder.
 - RabbitMQ publication failure must not roll back or invalidate a successful transfer.
-- Rejected and rolled-back transfers must not create notification intents.
+- Replayed and rejected transfers must not request another notification publication.
 
 ---
 

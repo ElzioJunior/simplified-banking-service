@@ -246,6 +246,18 @@ Avoid:
 ## Line Length and Formatting
 
 - Maximum line length: **200 characters**.
+- Keep a method or constructor declaration's complete parameter list on the
+  same line when the resulting line is at most **120 characters**. Break the
+  parameter list only when that line would exceed 120 characters.
+- Apply the same 120-character rule to method and constructor invocations:
+  keep arguments on the same line while the complete invocation fits, and wrap
+  only when it would exceed the threshold. Syntax that is inherently
+  multiline, such as text blocks or multiline lambdas, is exempt.
+- When wrapping is necessary, group parameters or arguments into the fewest
+  readable continuation lines that stay within 120 characters; one item per
+  line is not required.
+- For parameter and argument lists, this 120-character rule takes precedence
+  over the general preference for shorter lines.
 - Prefer shorter lines when they improve readability.
 - Follow configured formatter and static-analysis rules.
 - Do not manually format code in conflict with automated formatting.

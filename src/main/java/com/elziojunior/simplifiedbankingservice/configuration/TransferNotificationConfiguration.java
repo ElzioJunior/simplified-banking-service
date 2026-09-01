@@ -8,12 +8,10 @@ import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
-/** Declares the durable RabbitMQ boundary used by transfer notification intents. */
+/** Declares the RabbitMQ boundary used by direct transfer notification events. */
 @Configuration
 @EnableRabbit
-@EnableScheduling
 public class TransferNotificationConfiguration {
 
     public static final String EXCHANGE = "banking.transfer.notifications";

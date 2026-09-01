@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,12 +31,12 @@ import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundExcept
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
 import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.TransferIdempotencyTokenEntity;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTokenRepository;
-import com.elziojunior.simplifiedbankingservice.repository.TransferNotificationOutboxRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CreateTransferServiceTest {
@@ -48,7 +49,7 @@ class CreateTransferServiceTest {
     @Mock private TransferIdempotencyTokenRepository tokenRepository;
     @Mock private AccountRepository accountRepository;
     @Mock private MovementRepository movementRepository;
-    @Mock private TransferNotificationOutboxRepository outboxRepository;
+    @Mock private TransferNotificationPublisher notificationPublisher;
     @Mock private TransferLockTimeoutConfigurer lockTimeoutConfigurer;
 
     private CreateTransferService service;
@@ -62,7 +63,7 @@ class CreateTransferServiceTest {
                 tokenRepository,
                 accountRepository,
                 movementRepository,
-                outboxRepository,
+                notificationPublisher,
                 lockTimeoutConfigurer,
                 uuidGenerator,
                 Clock.fixed(Instant.parse("2026-08-31T19:00:00Z"), ZoneOffset.UTC));
@@ -84,7 +85,14 @@ class CreateTransferServiceTest {
         verify(source).updateBalance(new BigDecimal("60.00"));
         verify(destination).updateBalance(new BigDecimal("65.00"));
         verify(movementRepository).saveAll(any());
-        verify(outboxRepository).save(any());
+        ArgumentCaptor<TransferCompletedNotification> notification =
+                ArgumentCaptor.forClass(TransferCompletedNotification.class);
+        verify(notificationPublisher).publish(notification.capture());
+        assertThat(notification.getValue().eventId()).isEqualTo(EVENT);
+        assertThat(notification.getValue().operationId()).isEqualTo(OPERATION);
+        assertThat(notification.getValue().recipientAccountId()).isEqualTo(20L);
+        assertThat(notification.getValue().eventType()).isEqualTo(TransferCompletedNotification.TRANSFER_COMPLETED);
+        assertThat(notification.getValue().amount()).isEqualByComparingTo("40.00");
         assertThat(token.getOperationId()).isEqualTo(OPERATION);
         InOrder locks = inOrder(accountRepository);
         locks.verify(accountRepository).findByIdForUpdate(10L);
@@ -102,7 +110,7 @@ class CreateTransferServiceTest {
         assertThat(result.transferId()).isEqualTo(OPERATION);
         verify(accountRepository, never()).findByIdForUpdate(any());
         verify(movementRepository, never()).saveAll(any());
-        verify(outboxRepository, never()).save(any());
+        verify(notificationPublisher, never()).publish(any());
     }
 
     /** Proves a completed token cannot authorize a different normalized payload. */
@@ -185,7 +193,7 @@ class CreateTransferServiceTest {
                 .isInstanceOf(TransferConflictException.class);
 
         verify(movementRepository, never()).saveAll(any());
-        verify(outboxRepository, never()).save(any());
+        verify(notificationPublisher, never()).publish(any());
     }
 
     private CreateTransferDto command(long sourceId, long destinationId, String amount) {

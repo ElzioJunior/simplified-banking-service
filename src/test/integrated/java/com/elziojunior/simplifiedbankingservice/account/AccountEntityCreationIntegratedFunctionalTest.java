@@ -30,8 +30,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.CreateAccountRequest;
 import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "transfer.notifications.publisher.enabled=false")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountEntityCreationIntegratedFunctionalTest {
 
     @Container

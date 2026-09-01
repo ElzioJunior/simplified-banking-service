@@ -18,15 +18,11 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:simplified_banking}
     password: ${RABBITMQ_PASSWORD:simplified_banking}
-    publisher-confirm-type: correlated
 
 transfer:
   notifications:
     publisher:
-      enabled: ${TRANSFER_NOTIFICATION_PUBLISHER_ENABLED:true}
-      batch-size: ${TRANSFER_NOTIFICATION_BATCH_SIZE:50}
-      fixed-delay-ms: ${TRANSFER_NOTIFICATION_RETRY_DELAY_MS:1000}
-      confirm-timeout-ms: ${TRANSFER_NOTIFICATION_CONFIRM_TIMEOUT_MS:5000}
+      max-attempts: ${TRANSFER_NOTIFICATION_MAX_ATTEMPTS:3}
 
 server:
   port: ${SERVER_PORT:8080}

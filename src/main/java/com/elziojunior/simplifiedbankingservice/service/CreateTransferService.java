@@ -18,15 +18,14 @@ import com.elziojunior.simplifiedbankingservice.exception.TransferNotFoundExcept
 import com.elziojunior.simplifiedbankingservice.exception.TransferValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.CompletedTransferDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateTransferDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.TransferCompletedNotification;
 import com.elziojunior.simplifiedbankingservice.model.entity.AccountEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 import com.elziojunior.simplifiedbankingservice.model.entity.TransferIdempotencyTokenEntity;
-import com.elziojunior.simplifiedbankingservice.model.entity.TransferNotificationOutboxEntity;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTokenRepository;
-import com.elziojunior.simplifiedbankingservice.repository.TransferNotificationOutboxRepository;
 
 /** Executes one complete idempotent account-to-account financial operation. */
 @Service
@@ -38,7 +37,7 @@ public class CreateTransferService {
     private final TransferIdempotencyTokenRepository tokenRepository;
     private final AccountRepository accountRepository;
     private final MovementRepository movementRepository;
-    private final TransferNotificationOutboxRepository outboxRepository;
+    private final TransferNotificationPublisher notificationPublisher;
     private final TransferLockTimeoutConfigurer lockTimeoutConfigurer;
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
@@ -47,14 +46,14 @@ public class CreateTransferService {
             TransferIdempotencyTokenRepository tokenRepository,
             AccountRepository accountRepository,
             MovementRepository movementRepository,
-            TransferNotificationOutboxRepository outboxRepository,
+            TransferNotificationPublisher notificationPublisher,
             TransferLockTimeoutConfigurer lockTimeoutConfigurer,
             UuidGenerator uuidGenerator,
             Clock clock) {
         this.tokenRepository = tokenRepository;
         this.accountRepository = accountRepository;
         this.movementRepository = movementRepository;
-        this.outboxRepository = outboxRepository;
+        this.notificationPublisher = notificationPublisher;
         this.lockTimeoutConfigurer = lockTimeoutConfigurer;
         this.uuidGenerator = uuidGenerator;
         this.clock = clock;
@@ -63,7 +62,8 @@ public class CreateTransferService {
     /**
      * Serializes token use and account mutation inside one READ_COMMITTED
      * transaction so a completed retry is replayed and every new operation is
-     * all-or-nothing across balances, movements, token, and notification intent.
+     * all-or-nothing across balances, movements, and token association. A new
+     * completion also requests best-effort event publication.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public CompletedTransferDto create(CreateTransferDto transfer) {
@@ -100,8 +100,13 @@ public class CreateTransferService {
                 new MovementEntity(destination, operationId, MovementType.CREDIT, requested.amount(), now)));
         token.associate(operationId, source.getId(), destination.getId(), requested.amount(), now);
         tokenRepository.save(token);
-        outboxRepository.save(new TransferNotificationOutboxEntity(
-                eventId, operationId, source.getId(), requested.amount(), now));
+        notificationPublisher.publish(new TransferCompletedNotification(
+                eventId,
+                operationId,
+                source.getId(),
+                TransferCompletedNotification.TRANSFER_COMPLETED,
+                requested.amount(),
+                now));
         return new CompletedTransferDto(operationId, source.getId(), destination.getId(), requested.amount());
     }
 

@@ -139,28 +139,27 @@ is configured, so none is claimed.
 - Final review fixes and documentation are recorded by the subsequent
   finalization commit in branch history.
 
-## Active plan: EPIC002
+## Completed plan: EPIC002
 
 ### Planned scope
 
 Deliver only server-issued 10-minute transfer tokens, atomic
 account-to-account transfers through `POST /api/v1/transfers`, exactly two
-correlated movements, and one durable asynchronous notification intent for the
-source account holder. Movement-query APIs, notification delivery channels,
+correlated movements, and one best-effort direct RabbitMQ notification event
+for the source account holder. Movement-query APIs, notification delivery channels,
 authentication, overdrafts, fees, scheduled transfers, and a separate Transfer
 entity remain excluded.
 
 ### Delivery order
 
-1. Add Flyway V2 token/outbox storage and verify real PostgreSQL constraints.
+1. Keep Flyway V2 history, add V3 outbox removal, and verify real PostgreSQL constraints.
 2. Add persistence mappings, repositories, deterministic pessimistic locking,
    and configurable bounded lock waiting.
 3. Implement and expose token issuance.
 4. Implement the single-transaction idempotent transfer use case.
 5. Expose the versioned transfer API and safe RFC 9457 failures.
-6. Publish durable notification intents to RabbitMQ after commit with confirms
-   and retry of pending outbox records.
-7. Prove rollback, recovery, idempotency, and concurrency through real
+6. Publish notifications directly to RabbitMQ with bounded in-memory retry.
+7. Prove rollback, direct publication, idempotency, and concurrency through real
    HTTP/PostgreSQL/RabbitMQ Testcontainers.
 8. Prepare Gatling load simulations, then complete quality gates, review, and
    documentation.
@@ -170,10 +169,9 @@ entity remain excluded.
 ADR-0026 fixes the token endpoint and `Idempotency-Key` contract. ADR-0024 and
 ADR-0025 require ascending-ID pessimistic locks within one `READ_COMMITTED`
 transaction. ADR-0029 bounds lock waiting, prohibits automatic whole-transfer
-retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0028 uses a
-transactional outbox so RabbitMQ availability cannot determine the financial
-commit. RabbitMQ publication is at least once, so stable event identity is
-mandatory for downstream deduplication. Hot accounts intentionally serialize;
+retry, and defines `400`/`404`/`409`/`503` Problem Details. ADR-0030 uses direct
+best-effort RabbitMQ publication with bounded in-memory retry and no durable
+recovery or atomic database/broker boundary. Hot accounts intentionally serialize;
 distributed accounts should retain independent throughput. The API remains
 temporarily unauthenticated under ADR-0027 and is unsuitable for untrusted
 network exposure. ADR-0008 supplies bounded Micrometer outcome, latency,
@@ -211,7 +209,7 @@ execution remain excluded unless their respective authorization is explicit.
 
 Development authorization was granted on 2026-08-31. It covers the planned
 implementation, local quality and disposable integrated tests, review/fix
-loops, documentation, and normal non-destructive commits and pushes. Flyway V2
+loops, documentation, and normal non-destructive commits and pushes. Flyway V3
 and its 7 PostgreSQL 17.6 schema scenarios are complete. Separate Gatling
 authorization was granted on 2026-08-31 for `http://localhost:18080`, the
 `dedicated-load-test` identity, 10 requests/second for 30 seconds per
@@ -223,8 +221,8 @@ cleanup.
 Slices 1–7 and the preparation portion of slice 8 are complete. The application
 now issues 10-minute UUID tokens, executes idempotent `HALF_EVEN` transfers in
 one `READ_COMMITTED` transaction, applies a transaction-local PostgreSQL lock
-timeout, persists movements and the source notification intent atomically, and
-publishes pending outbox events only after RabbitMQ confirmation. Safe Problem
+timeout, persists movements and token association atomically, and requests a
+direct best-effort RabbitMQ event publication for each new transfer. Safe Problem
 Details, bounded Micrometer metrics, and operation-ID-only success correlation
 are included. The temporary unauthenticated API boundary and bearer-token TODO
 remain unchanged.
@@ -241,12 +239,12 @@ Validation on 2026-08-31:
 
 - `./mvnw -B -ntp verify` passed 43 unit tests, 12 isolated MVC tests,
   and the 90% eligible-line coverage gate.
-- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` passed 20 real
-  scenarios: 8 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
+- `./mvnw -B -ntp -Pintegrated-functional-tests verify` passed 18 real
+  scenarios: 6 transfer HTTP/PostgreSQL/RabbitMQ scenarios, 5 account
   regressions, and 7 Flyway/schema scenarios. Transfer coverage includes
   replay/mismatch, atomic rejection, 100 competing debits, money conservation,
-  cross-transfers, bounded lock failure and metrics, late-failure rollback, and
-  RabbitMQ outage/recovery.
+  cross-transfers, bounded lock failure and metrics, direct RabbitMQ
+  publication, and Flyway V3 outbox removal.
 - `DistributedTransferSimulation` passed 300/300 requests at 10 requests/second
   with zero failures, 9 ms mean latency, 14 ms p95, and conserved total money.
 - `HotSourceTransferSimulation` passed 300/300 requests at 10 requests/second
@@ -256,11 +254,14 @@ Validation on 2026-08-31:
   4.2.14.Final only for load execution; both simulations passed after the fix.
 - `docker compose config --quiet` and `git diff --check` passed.
 
-Independent review found no unresolved BLOCKER or HIGH issue. Review fixes made
-the PostgreSQL timeout transaction-local, separated generic transient-database
-metrics from lock-contention metrics, restricted RabbitMQ deserialization to
-the event package, and added rollback, recovery, cross-transfer, and
-100-request contention evidence. No absent quality gate is claimed.
+The original delivery review found no unresolved BLOCKER or HIGH issue. Review
+fixes made the PostgreSQL timeout transaction-local, separated generic
+transient-database metrics from lock-contention metrics, restricted RabbitMQ
+deserialization to the event package, and added rollback, recovery,
+cross-transfer, and 100-request contention evidence. The later outbox recovery
+mechanism was explicitly superseded by ADR-0030; direct publication and Flyway
+V3 were revalidated through the configured unit, isolated, and integrated
+gates. No absent quality gate is claimed.
 
 Delivery checkpoints:
 
@@ -270,5 +271,6 @@ Delivery checkpoints:
 - `26d9879` — strengthened rollback, cross-transfer, lock-metric, and
   100-request concurrency verification.
 
-EPIC002 implementation, local verification, independent review, authorized
-load execution, consistency checks, cleanup, and documentation are complete.
+EPIC002 implementation, local verification, authorized load execution,
+subsequent direct-publication simplification, consistency checks, cleanup, and
+documentation are complete.
