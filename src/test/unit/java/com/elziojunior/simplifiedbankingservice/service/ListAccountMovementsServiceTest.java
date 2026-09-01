@@ -9,7 +9,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -32,6 +35,7 @@ import com.elziojunior.simplifiedbankingservice.exception.AccountMovementNotFoun
 import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
@@ -41,8 +45,7 @@ import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 class ListAccountMovementsServiceTest {
 
     private static final long ACCOUNT_ID = 41L;
-    private static final OffsetDateTime START = OffsetDateTime.parse("2026-08-01T00:00:00Z");
-    private static final OffsetDateTime END = OffsetDateTime.parse("2026-09-01T00:00:00Z");
+    private static final OffsetDateTime END = OffsetDateTime.parse("2026-03-31T12:00:00Z");
 
     @Mock
     private AccountRepository accountRepository;
@@ -54,7 +57,10 @@ class ListAccountMovementsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ListAccountMovementsService(accountRepository, movementRepository);
+        service = new ListAccountMovementsService(
+                accountRepository,
+                movementRepository,
+                Clock.fixed(Instant.parse("2026-03-31T12:00:00Z"), ZoneOffset.UTC));
     }
 
     /**
@@ -72,13 +78,14 @@ class ListAccountMovementsServiceTest {
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(true);
         when(movementRepository.findPageByAccountAndFilters(
                 org.mockito.ArgumentMatchers.eq(ACCOUNT_ID),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(END.minusDays(1)),
+                org.mockito.ArgumentMatchers.eq(END),
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(movement), PageRequest.of(0, 10), 1));
 
-        MovementPageDto result = service.list(new ListAccountMovementsDto(ACCOUNT_ID, 0, null, null, null));
+        MovementPageDto result = service.list(
+                new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_DAY, null));
 
         assertThat(result.page()).isZero();
         assertThat(result.size()).isEqualTo(10);
@@ -94,8 +101,8 @@ class ListAccountMovementsServiceTest {
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(movementRepository).findPageByAccountAndFilters(
                 org.mockito.ArgumentMatchers.eq(ACCOUNT_ID),
-                org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(END.minusDays(1)),
+                org.mockito.ArgumentMatchers.eq(END),
                 org.mockito.ArgumentMatchers.isNull(),
                 pageable.capture());
         assertThat(pageable.getValue().getPageNumber()).isZero();
@@ -105,25 +112,26 @@ class ListAccountMovementsServiceTest {
     }
 
     /**
-     * Proves later-page requests and every approved optional-filter
-     * combination reach the single repository query unchanged.
+     * Proves every approved period computes the exact lower bound, including a
+     * calendar month that differs from a fixed 30-day duration.
      */
     @ParameterizedTest
-    @MethodSource("filters")
-    void shouldApplyEveryFilterCombination(OffsetDateTime start, OffsetDateTime end, MovementType type) {
+    @MethodSource("periods")
+    void shouldResolveEveryLookbackPeriod(MovementLookbackPeriod period, OffsetDateTime expectedStart) {
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(true);
         PageRequest expectedPage = PageRequest.of(2, 10, Sort.by(
                 Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, start, end, type, expectedPage))
+        when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, expectedStart, END, MovementType.DEBIT, expectedPage))
                 .thenReturn(new PageImpl<>(List.of(), expectedPage, 21));
 
-        MovementPageDto result = service.list(new ListAccountMovementsDto(ACCOUNT_ID, 2, start, end, type));
+        MovementPageDto result = service.list(new ListAccountMovementsDto(ACCOUNT_ID, 2, period, MovementType.DEBIT));
 
         assertThat(result.page()).isEqualTo(2);
         assertThat(result.content()).isEmpty();
         assertThat(result.totalElements()).isEqualTo(21);
         assertThat(result.totalPages()).isEqualTo(3);
-        verify(movementRepository).findPageByAccountAndFilters(ACCOUNT_ID, start, end, type, expectedPage);
+        verify(movementRepository)
+                .findPageByAccountAndFilters(ACCOUNT_ID, expectedStart, END, MovementType.DEBIT, expectedPage);
     }
 
     /** Proves a known account with no movements is a successful empty page rather than a not-found result. */
@@ -132,10 +140,11 @@ class ListAccountMovementsServiceTest {
         PageRequest page = PageRequest.of(0, 10, Sort.by(
                 Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(true);
-        when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, null, null, null, page))
+        when(movementRepository.findPageByAccountAndFilters(ACCOUNT_ID, END.minusWeeks(1), END, null, page))
                 .thenReturn(new PageImpl<>(List.of(), page, 0));
 
-        MovementPageDto result = service.list(new ListAccountMovementsDto(ACCOUNT_ID, 0, null, null, null));
+        MovementPageDto result = service.list(
+                new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_WEEK, null));
 
         assertThat(result.content()).isEmpty();
         assertThat(result.totalElements()).isZero();
@@ -147,20 +156,20 @@ class ListAccountMovementsServiceTest {
     void shouldRejectUnknownAccountWithoutQueryingMovements() {
         when(accountRepository.existsById(ACCOUNT_ID)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.list(new ListAccountMovementsDto(ACCOUNT_ID, 0, null, null, null)))
+        assertThatThrownBy(() -> service.list(
+                new ListAccountMovementsDto(ACCOUNT_ID, 0, MovementLookbackPeriod.ONE_DAY, null)))
                 .isInstanceOf(AccountMovementNotFoundException.class)
                 .hasMessage("The requested account does not exist.");
 
         verifyNoInteractions(movementRepository);
     }
 
-    /** Proves null input, negative pages, and non-increasing ranges fail before any persistence access. */
+    /** Proves null input, negative pages, and an absent period fail before any persistence access. */
     @Test
     void shouldRejectInvalidQueriesBeforeRepositoryAccess() {
         List<ListAccountMovementsDto> invalidQueries = List.of(
-                new ListAccountMovementsDto(ACCOUNT_ID, -1, null, null, null),
-                new ListAccountMovementsDto(ACCOUNT_ID, 0, START, START, null),
-                new ListAccountMovementsDto(ACCOUNT_ID, 0, END, START, null));
+                new ListAccountMovementsDto(ACCOUNT_ID, -1, MovementLookbackPeriod.ONE_DAY, null),
+                new ListAccountMovementsDto(ACCOUNT_ID, 0, null, null));
 
         assertThatThrownBy(() -> service.list(null))
                 .isInstanceOf(AccountMovementValidationException.class);
@@ -171,15 +180,11 @@ class ListAccountMovementsServiceTest {
         verifyNoInteractions(movementRepository);
     }
 
-    private static Stream<Arguments> filters() {
+    private static Stream<Arguments> periods() {
         return Stream.of(
-                Arguments.of(null, null, MovementType.CREDIT),
-                Arguments.of(null, null, MovementType.DEBIT),
-                Arguments.of(START, null, null),
-                Arguments.of(null, END, null),
-                Arguments.of(START, END, null),
-                Arguments.of(START, END, MovementType.CREDIT),
-                Arguments.of(START, END, MovementType.DEBIT));
+                Arguments.of(MovementLookbackPeriod.ONE_DAY, END.minusDays(1)),
+                Arguments.of(MovementLookbackPeriod.ONE_WEEK, END.minusWeeks(1)),
+                Arguments.of(MovementLookbackPeriod.ONE_MONTH, END.minusMonths(1)));
     }
 
     private MovementEntity movement(

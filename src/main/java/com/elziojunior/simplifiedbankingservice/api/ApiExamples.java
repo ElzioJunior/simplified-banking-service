@@ -184,12 +184,12 @@ final class ApiExamples {
               "detail": "Transfer amount is outside the supported monetary range."
             }
             """;
-    static final String INVALID_MOVEMENT_RANGE = """
+    static final String INVALID_MOVEMENT_PERIOD = """
             {
               "type": "about:blank",
-              "title": "Invalid movement query",
+              "title": "Invalid request",
               "status": 400,
-              "detail": "Start must be before end."
+              "detail": "The request is invalid."
             }
             """;
     static final String ACCOUNT_NOT_FOUND = """

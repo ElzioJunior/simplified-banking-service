@@ -10,7 +10,7 @@ This is the single execution report for all epic execution plans.
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
 | EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Completed | 54 unit, 30 isolated PostgreSQL, and 1 RabbitMQ integration test passed |
-| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | Completed | 69 unit, 42 isolated, and 1 RabbitMQ integration test passed |
+| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | In progress | Replacing arbitrary dates with fixed lookback periods |
 
 ## Completed foundation work
 

@@ -36,6 +36,9 @@ to its governing BDR, ADR, engineering standard, or product document.
   infrastructure, and observability topology through one Docker Compose command
   under
   [ADR-0034](adr/ADR-0034-use-docker-compose-for-complete-local-product-startup.md).
+- Account movement queries accept only the fixed lookback periods `1d`, `1w`,
+  and `1M`, defaulting to `1d`, under
+  [BDR-0006](bdr/BDR-0006-use-fixed-lookback-periods-for-movement-queries.md).
 
 ## Open
 

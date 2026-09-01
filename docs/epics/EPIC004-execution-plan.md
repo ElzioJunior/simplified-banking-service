@@ -1,5 +1,45 @@
 # EPIC004 — Execution Plan
 
+## Approved contract revision — fixed lookback periods
+
+BDR-0006 supersedes the original arbitrary `start` and `end` contract described
+later in this historical plan. The active revision keeps the endpoint,
+pagination, ordering, account scope, movement-type filter, and response envelope
+unchanged while replacing those parameters with `period=1d|1w|1M`, defaulting
+to `1d`.
+
+### Revision acceptance criteria
+
+- The request exposes `period` and no longer exposes `start` or `end`.
+- Omitted `period` resolves to one day before the request instant.
+- `1d`, `1w`, and `1M` resolve respectively to one day, one week, and one
+  calendar month before the same request instant.
+- Unsupported or case-mismatched period values return safe `400` Problem
+  Details before the service is called.
+- Period and `CREDIT`/`DEBIT` filters may be combined.
+- The repository receives real computed bounds and contains no sentinel date.
+- Existing pagination, ordering, ownership, empty-result, error, metrics, and
+  read-only behavior remains unchanged.
+
+### Revision slices
+
+1. Supersede BDR-0002 with BDR-0006 and align EPIC004, the decision register,
+   Swagger descriptions, and public documentation with the approved contract.
+2. Replace API date fields with the validated period string, map it to an
+   application period enum, resolve deterministic bounds through the existing
+   application `Clock`, and remove the repository sentinel-date path.
+3. Update unit tests for mapping and exact day/week/calendar-month bounds;
+   update MVC tests for defaults, accepted values, combinations, and rejection;
+   update PostgreSQL functional tests for real boundary filtering without table
+   cleanup; update OpenAPI contract assertions.
+4. Run focused tests, configured quality gates, independent review, affected
+   reruns, and final documentation synchronization.
+
+No migration, logical data-model change, new dependency, RabbitMQ behavior, or
+real-boundary integrated scenario is required. Every computed-boundary method,
+application-owned model property, and changed test scenario retains the
+project's mandatory JavaDoc baseline.
+
 ## Preconditions and decisions
 
 - Scope is limited to the read-only
@@ -161,7 +201,17 @@ deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: completed on 2026-09-01.
+- Status: fixed-lookback contract revision in progress on 2026-09-01.
+- Completed revision slices: BDR/contract documentation, application and
+  repository implementation, unit tests, MVC contract tests, OpenAPI checks,
+  and real HTTP/PostgreSQL period scenarios.
+- Focused validation: 18 affected unit tests passed; the focused PostgreSQL
+  lifecycle passed all 68 unit tests and 5 movement scenarios; the focused MVC
+  and OpenAPI lifecycle passed all 68 unit tests and 9 isolated scenarios. The
+  configured coverage check passed in both `verify` executions.
+- Active next action: run comprehensive quality gates, independent review, and
+  final documentation synchronization.
+- Original delivery status: completed on 2026-09-01.
 - Completed work: the account-scoped pageable query, read-only service, DTOs,
   public API models, MapStruct mapper, controller, safe errors, bounded
   `movement.list` metrics, unit/MVC/PostgreSQL tests, review fixes, and public

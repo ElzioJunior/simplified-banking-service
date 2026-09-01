@@ -53,7 +53,7 @@ public class AccountMovementController {
     @ObservedApiOperation(ApiOperation.MOVEMENT_LIST)
     @Operation(
             summary = "List account movements",
-            description = "Returns a fixed-size page ordered newest first. Start is inclusive and end is exclusive.")
+            description = "Returns a fixed-size page ordered newest first for the selected recent period.")
     @Parameters({
             @Parameter(
                     name = "page",
@@ -64,19 +64,13 @@ public class AccountMovementController {
                             @ExampleObject(name = "invalidNegativePage", value = "-1")
                     }),
             @Parameter(
-                    name = "start",
-                    description = "Optional inclusive ISO 8601 date-time",
+                    name = "period",
+                    description = "Recent-history period; defaults to 1d",
                     examples = {
-                            @ExampleObject(name = "utcStart", value = "2026-08-01T00:00:00Z"),
-                            @ExampleObject(name = "reversedRangeStart", value = "2026-09-02T00:00:00Z"),
-                            @ExampleObject(name = "invalidDate", value = "not-a-date")
-                    }),
-            @Parameter(
-                    name = "end",
-                    description = "Optional exclusive ISO 8601 date-time; must be after start",
-                    examples = {
-                            @ExampleObject(name = "utcEnd", value = "2026-09-01T00:00:00Z"),
-                            @ExampleObject(name = "reversedRangeEnd", value = "2026-09-01T00:00:00Z")
+                            @ExampleObject(name = "oneDay", value = "1d"),
+                            @ExampleObject(name = "oneWeek", value = "1w"),
+                            @ExampleObject(name = "oneMonth", value = "1M"),
+                            @ExampleObject(name = "invalidPeriod", value = "30d")
                     }),
             @Parameter(
                     name = "type",
@@ -99,13 +93,12 @@ public class AccountMovementController {
                             })),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Invalid page, date, range, or movement type",
+                    description = "Invalid page, period, or movement type",
                     content = @Content(
                             schema = @Schema(implementation = org.springframework.http.ProblemDetail.class),
                             examples = {
                                     @ExampleObject(name = "transportValidation", value = ApiExamples.INVALID_REQUEST),
-                                    @ExampleObject(
-                                            name = "invalidDateRange", value = ApiExamples.INVALID_MOVEMENT_RANGE)
+                                    @ExampleObject(name = "invalidPeriod", value = ApiExamples.INVALID_MOVEMENT_PERIOD)
                             })),
             @ApiResponse(
                     responseCode = "404",

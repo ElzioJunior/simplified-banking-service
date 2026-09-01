@@ -15,6 +15,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementPageRes
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementType;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 
@@ -22,17 +23,23 @@ class AccountMovementMapperTest {
 
     private final AccountMovementMapper mapper = Mappers.getMapper(AccountMovementMapper.class);
 
-    /** Proves absent pagination defaults to zero while all supplied HTTP filters cross the boundary unchanged. */
+    /** Proves absent pagination and period receive their defaults while the supplied type crosses the boundary. */
     @Test
     void shouldMapHttpFiltersToApplicationQuery() {
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-01T00:00:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-09-01T00:00:00Z");
-        AccountMovementFilterRequest request =
-                new AccountMovementFilterRequest(null, start, end, AccountMovementType.CREDIT);
+        AccountMovementFilterRequest request = new AccountMovementFilterRequest(null, null, AccountMovementType.CREDIT);
 
         ListAccountMovementsDto result = mapper.toDto(41L, request);
 
-        assertThat(result).isEqualTo(new ListAccountMovementsDto(41L, 0, start, end, MovementType.CREDIT));
+        assertThat(result).isEqualTo(
+                new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, MovementType.CREDIT));
+    }
+
+    /** Proves each case-sensitive public period maps to its explicit application value. */
+    @Test
+    void shouldMapEverySupportedPeriod() {
+        assertThat(mapPeriod("1d")).isEqualTo(MovementLookbackPeriod.ONE_DAY);
+        assertThat(mapPeriod("1w")).isEqualTo(MovementLookbackPeriod.ONE_WEEK);
+        assertThat(mapPeriod("1M")).isEqualTo(MovementLookbackPeriod.ONE_MONTH);
     }
 
     /** Proves page metadata and movement fields are exposed without leaking an entity or account graph. */
@@ -60,5 +67,9 @@ class AccountMovementMapperTest {
             assertThat(movement.amount()).isEqualByComparingTo("10.00");
             assertThat(movement.createdAt()).isEqualTo(createdAt);
         });
+    }
+
+    private MovementLookbackPeriod mapPeriod(String period) {
+        return mapper.toDto(41L, new AccountMovementFilterRequest(0, period, null)).period();
     }
 }

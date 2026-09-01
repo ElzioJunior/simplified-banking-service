@@ -6,7 +6,7 @@ Provide a simple REST API for listing the financial movements of one account.
 
 The list must be paginated and may be filtered only by:
 
-- Movement date/time range.
+- Recent period: `1d`, `1w`, or `1M`.
 - Movement type: `CREDIT` or `DEBIT`.
 
 The endpoint is read-only. It does not modify accounts, balances, movements, or
@@ -14,15 +14,14 @@ transfer state.
 
 ## Delivery status
 
-Completed on 2026-09-01. The read-only endpoint, fixed pagination, filters,
-bounded metrics, safe errors, and PostgreSQL-backed verification were delivered
-as defined in the [EPIC004 execution plan](EPIC004-execution-plan.md).
+Contract revision in progress on 2026-09-01. The original arbitrary date range
+is being replaced by the fixed periods defined in BDR-0006.
 
 ---
 
 ## Governing context
 
-- [BDR-0002 — Financial Movement Query Rules](../bdr/BDR-0002-financial-movement-query-rules.md)
+- [BDR-0006 — Use Fixed Lookback Periods for Movement Queries](../bdr/BDR-0006-use-fixed-lookback-periods-for-movement-queries.md)
 - [ADR-0011 — Standardize REST API Error Responses](../adr/ADR-0011-standardize-rest-api-error-responses.md)
 - [ADR-0012 — Version the REST API](../adr/ADR-0012-version-the-rest-api.md)
 - [ADR-0023 — Use LAZY Fetching as the Default JPA Relationship Strategy](../adr/ADR-0023-use-lazy-fetching-as-the-default-jpa-relationship-strategy.md)
@@ -45,8 +44,7 @@ change or database migration is expected for this scope.
 | Parameter | Required | Description |
 | --- | --- | --- |
 | `page` | No | Zero-based page number. Defaults to `0`. |
-| `start` | No | Inclusive ISO 8601 date/time lower bound. |
-| `end` | No | Exclusive ISO 8601 date/time upper bound. |
+| `period` | No | Recent period: `1d`, `1w`, or `1M`. Defaults to `1d`. |
 | `type` | No | Movement type: `CREDIT` or `DEBIT`. |
 
 Each page contains at most 10 movements. A custom page-size parameter is not
@@ -58,7 +56,7 @@ ID descending as the deterministic tie-breaker.
 Example request:
 
 ```http
-GET /api/v1/accounts/1/movements?page=0&start=2026-08-01T00:00:00Z&end=2026-09-01T00:00:00Z&type=CREDIT
+GET /api/v1/accounts/1/movements?page=0&period=1w&type=CREDIT
 ```
 
 ### Successful Response
@@ -90,7 +88,7 @@ array and zero totals.
 
 Errors use safe RFC 9457 Problem Details:
 
-- `400 Bad Request` — invalid page, date/time, date range, or movement type.
+- `400 Bad Request` — invalid page, period, or movement type.
 - `404 Not Found` — the account does not exist.
 
 The endpoint remains temporarily unauthenticated under
@@ -105,9 +103,9 @@ The endpoint remains temporarily unauthenticated under
 - [x] Results are paginated with at most 10 movements per page.
 - [x] Page numbering starts at zero and defaults to the first page.
 - [x] Results are ordered deterministically from newest to oldest.
-- [x] The client may filter by optional `start` and `end` date/time values.
+- [ ] The client may select only `1d`, `1w`, or `1M`, with `1d` as the default.
 - [x] The client may filter by `CREDIT` or `DEBIT`.
-- [x] Date/time and type filters may be combined.
+- [ ] Period and type filters may be combined.
 - [x] An empty result returns a successful empty page.
 - [x] An unknown account returns `404 Not Found`.
 - [x] Invalid query parameters return safe Problem Details with `400 Bad Request`.
@@ -165,10 +163,10 @@ The endpoint remains temporarily unauthenticated under
 
 ---
 
-## US-003 — Filter Movements by Date Range
+## US-003 — Filter Movements by Recent Period
 
 **As an** API client
-**I want to** filter movements by date/time range
+**I want to** select a supported recent period
 **So that** I can inspect activity from a specific period.
 
 ### Scenario
@@ -179,11 +177,12 @@ The endpoint remains temporarily unauthenticated under
 
 **When:**
 
-- The client supplies `start` and `end`.
+- The client supplies `period=1d`, `period=1w`, or `period=1M`.
 
 **Then:**
 
-- Only movements inside the requested range are returned.
+- Only movements within the selected period are returned.
+- When the period is omitted, only movements from the last day are returned.
 
 ---
 

@@ -96,11 +96,12 @@ class OpenApiDocumentationFunctionalTest {
 
         JsonNode movements = paths.path("/api/v1/accounts/{accountId}/movements").path("get");
         assertThat(movements.path("parameters").toString())
-                .contains("accountId", "page", "start", "end", "type", "invalidNegativePage", "invalidDate",
-                        "reversedRangeStart", "reversedRangeEnd", "invalidType");
+                .contains("accountId", "page", "period", "type", "invalidNegativePage", "oneDay", "oneWeek",
+                        "oneMonth", "invalidPeriod", "invalidType")
+                .doesNotContain("\"start\"", "\"end\"");
         assertThat(movements.path("responses").toString())
                 .contains(
-                        "filteredMovementPage", "emptyMovementPage", "invalidDateRange", "unknownAccount",
+                        "filteredMovementPage", "emptyMovementPage", "invalidPeriod", "unknownAccount",
                         "persistenceUnavailable");
 
         JsonNode token = paths.path("/api/v1/transfer-tokens").path("post");

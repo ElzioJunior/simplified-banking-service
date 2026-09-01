@@ -14,6 +14,7 @@ import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementFilterR
 import com.elziojunior.simplifiedbankingservice.model.api.AccountMovementPageResponse;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
 import com.elziojunior.simplifiedbankingservice.service.ListAccountMovementsService;
 
@@ -24,8 +25,9 @@ class AccountMovementControllerTest {
     void shouldMapMovementQueryAndResult() {
         ListAccountMovementsService service = mock(ListAccountMovementsService.class);
         AccountMovementMapper mapper = mock(AccountMovementMapper.class);
-        AccountMovementFilterRequest request = new AccountMovementFilterRequest(null, null, null, null);
-        ListAccountMovementsDto query = new ListAccountMovementsDto(41L, 0, null, null, null);
+        AccountMovementFilterRequest request = new AccountMovementFilterRequest(null, null, null);
+        ListAccountMovementsDto query =
+                new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, null);
         MovementPageDto page = new MovementPageDto(List.of(), 0, 10, 0, 0);
         AccountMovementPageResponse expected = new AccountMovementPageResponse(List.of(), 0, 10, 0, 0);
         when(mapper.toDto(41L, request)).thenReturn(query);

@@ -35,6 +35,7 @@ import com.elziojunior.simplifiedbankingservice.metrics.ApiMetricsInterceptor;
 import com.elziojunior.simplifiedbankingservice.metrics.ApiOperation;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementType;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapperImpl;
@@ -69,7 +70,8 @@ class AccountMovementListingFunctionalTest {
     void shouldReturnDefaultMovementPageAndRecordMetrics() throws Exception {
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
         UUID operationId = UUID.fromString("00000000-0000-0000-0000-000000000042");
-        when(listAccountMovementsService.list(new ListAccountMovementsDto(41L, 0, null, null, null)))
+        when(listAccountMovementsService.list(
+                new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, null)))
                 .thenReturn(new MovementPageDto(
                         List.of(new MovementItemDto(
                                 42L, operationId, MovementType.CREDIT, new BigDecimal("100.00"), createdAt)),
@@ -92,30 +94,33 @@ class AccountMovementListingFunctionalTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.totalPages").value(1));
 
-        verify(listAccountMovementsService).list(new ListAccountMovementsDto(41L, 0, null, null, null));
+        verify(listAccountMovementsService)
+                .list(new ListAccountMovementsDto(41L, 0, MovementLookbackPeriod.ONE_DAY, null));
         verify(apiMetrics).recordOutcome(ApiOperation.MOVEMENT_LIST, 200, sample);
     }
 
-    /** Proves page, offset-bearing range, and movement type are parsed and combined at the HTTP boundary. */
+    /** Proves page, each fixed period, and movement type are parsed and combined at the HTTP boundary. */
     @Test
     void shouldBindCombinedMovementFilters() throws Exception {
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-01T00:00:00-03:00");
-        OffsetDateTime end = OffsetDateTime.parse("2026-09-01T00:00:00-03:00");
-        ListAccountMovementsDto query = new ListAccountMovementsDto(41L, 2, start, end, MovementType.DEBIT);
-        when(listAccountMovementsService.list(query)).thenReturn(new MovementPageDto(List.of(), 2, 10, 21, 3));
+        for (String value : List.of("1d", "1w", "1M")) {
+            MovementLookbackPeriod period = switch (value) {
+                case "1d" -> MovementLookbackPeriod.ONE_DAY;
+                case "1w" -> MovementLookbackPeriod.ONE_WEEK;
+                case "1M" -> MovementLookbackPeriod.ONE_MONTH;
+                default -> throw new IllegalStateException();
+            };
+            ListAccountMovementsDto query = new ListAccountMovementsDto(41L, 2, period, MovementType.DEBIT);
+            when(listAccountMovementsService.list(query)).thenReturn(new MovementPageDto(List.of(), 2, 10, 21, 3));
 
-        mockMvc.perform(get("/api/v1/accounts/41/movements")
-                        .param("page", "2")
-                        .param("start", "2026-08-01T00:00:00-03:00")
-                        .param("end", "2026-09-01T00:00:00-03:00")
-                        .param("type", "DEBIT"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isEmpty())
-                .andExpect(jsonPath("$.page").value(2))
-                .andExpect(jsonPath("$.totalElements").value(21))
-                .andExpect(jsonPath("$.totalPages").value(3));
+            mockMvc.perform(get("/api/v1/accounts/41/movements")
+                            .param("page", "2")
+                            .param("period", value)
+                            .param("type", "DEBIT"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.page").value(2));
 
-        verify(listAccountMovementsService).list(query);
+            verify(listAccountMovementsService).list(query);
+        }
     }
 
     /** Proves an existing account with no matches has a normal empty response envelope. */
@@ -130,31 +135,32 @@ class AccountMovementListingFunctionalTest {
                 .andExpect(jsonPath("$.totalPages").value(0));
     }
 
-    /** Proves negative pages, malformed dates, and unsupported types fail before application invocation. */
+    /** Proves negative pages, unsupported periods, and unsupported types fail before application invocation. */
     @Test
     void shouldRejectInvalidTransportFiltersAndRecordRejectedMetric() throws Exception {
         Timer.Sample sample = org.mockito.Mockito.mock(Timer.Sample.class);
         when(apiMetrics.start()).thenReturn(sample);
 
         assertBadRequest("?page=-1", "Invalid request", "The request is invalid.");
-        assertBadRequest("?start=not-a-date", "Invalid request", "The request is invalid.");
+        assertBadRequest("?period=30d", "Invalid request", "The request is invalid.");
+        assertBadRequest("?period=1m", "Invalid request", "The request is invalid.");
         assertBadRequest("?type=UNKNOWN", "Invalid request", "The request is invalid.");
 
         verify(listAccountMovementsService, never()).list(any());
-        verify(apiMetrics, org.mockito.Mockito.times(3)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
+        verify(apiMetrics, org.mockito.Mockito.times(4)).recordOutcome(ApiOperation.MOVEMENT_LIST, 400, sample);
     }
 
-    /** Proves equal or reversed ranges and unknown accounts retain safe application-specific Problem Details. */
+    /** Proves application validation and unknown accounts retain safe application-specific Problem Details. */
     @Test
     void shouldTranslateApplicationQueryFailures() throws Exception {
         when(listAccountMovementsService.list(any()))
-                .thenThrow(new AccountMovementValidationException("Start must be before end."))
+                .thenThrow(new AccountMovementValidationException("Movement period is required."))
                 .thenThrow(new AccountMovementNotFoundException("The requested account does not exist."));
 
         assertBadRequest(
-                "?start=2026-09-01T00:00:00Z&end=2026-09-01T00:00:00Z",
+                "?period=1d",
                 "Invalid movement query",
-                "Start must be before end.");
+                "Movement period is required.");
         mockMvc.perform(get("/api/v1/accounts/999/movements"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))

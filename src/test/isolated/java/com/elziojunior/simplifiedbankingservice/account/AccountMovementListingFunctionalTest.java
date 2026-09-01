@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -17,11 +20,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -38,7 +45,10 @@ import com.elziojunior.simplifiedbankingservice.support.EphemeralPostgresGuard;
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties =
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration")
+@Import(AccountMovementListingFunctionalTest.FixedClockConfiguration.class)
 class AccountMovementListingFunctionalTest {
+
+    private static final OffsetDateTime NOW = OffsetDateTime.parse("2026-09-01T12:00:00Z");
 
     @Container
     @ServiceConnection
@@ -67,7 +77,7 @@ class AccountMovementListingFunctionalTest {
     void shouldPageOnlyOwnedMovementsInDeterministicOrder() {
         long accountId = createAccount();
         long otherAccountId = createAccount();
-        OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-20T12:00:00Z");
+        OffsetDateTime createdAt = NOW.minusHours(1);
         List<Long> movementIds = new ArrayList<>();
         for (int index = 0; index < 12; index++) {
             movementIds.add(createMovement(accountId, MovementType.CREDIT, createdAt, "1.00"));
@@ -89,39 +99,39 @@ class AccountMovementListingFunctionalTest {
                 .containsExactlyElementsOf(movementIds.subList(10, 12));
     }
 
-    /** Proves the real repository applies inclusive start and exclusive end boundaries exactly. */
+    /** Proves the default day and explicit week/month periods apply real computed PostgreSQL boundaries. */
     @Test
-    void shouldApplyHalfOpenDateRange() {
+    void shouldApplyFixedLookbackPeriods() {
         long accountId = createAccount();
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-10T00:00:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-08-20T00:00:00Z");
-        createMovement(accountId, MovementType.CREDIT, start.minusNanos(1_000), "1.00");
-        long atStart = createMovement(accountId, MovementType.CREDIT, start, "2.00");
-        long inside = createMovement(accountId, MovementType.CREDIT, end.minusNanos(1_000), "3.00");
-        createMovement(accountId, MovementType.CREDIT, end, "4.00");
+        createMovement(accountId, MovementType.CREDIT, NOW.minusMonths(1).minusNanos(1_000), "1.00");
+        long inMonth = createMovement(accountId, MovementType.CREDIT, NOW.minusWeeks(1).minusDays(1), "2.00");
+        long inWeek = createMovement(accountId, MovementType.CREDIT, NOW.minusDays(1).minusHours(1), "3.00");
+        long atDayStart = createMovement(accountId, MovementType.CREDIT, NOW.minusDays(1), "4.00");
+        long inDay = createMovement(accountId, MovementType.CREDIT, NOW.minusHours(1), "5.00");
+        createMovement(accountId, MovementType.CREDIT, NOW, "6.00");
 
-        AccountMovementPageResponse response = list(
-                accountId, "start", start.toString(), "end", end.toString());
+        AccountMovementPageResponse defaultDay = list(accountId);
+        AccountMovementPageResponse week = list(accountId, "period", "1w");
+        AccountMovementPageResponse month = list(accountId, "period", "1M");
 
-        assertThat(response.content()).extracting(AccountMovementResponse::id)
-                .containsExactly(inside, atStart);
-        assertThat(response.totalElements()).isEqualTo(2);
+        assertThat(defaultDay.content()).extracting(AccountMovementResponse::id).containsExactly(inDay, atDayStart);
+        assertThat(week.content()).extracting(AccountMovementResponse::id)
+                .containsExactly(inDay, atDayStart, inWeek);
+        assertThat(month.content()).extracting(AccountMovementResponse::id)
+                .containsExactly(inDay, atDayStart, inWeek, inMonth);
     }
 
-    /** Proves CREDIT, DEBIT, and combined range/type filters select only matching persisted movements. */
+    /** Proves CREDIT, DEBIT, and combined period/type filters select only matching persisted movements. */
     @Test
-    void shouldFilterMovementTypesAloneAndWithDates() {
+    void shouldFilterMovementTypesAloneAndWithPeriod() {
         long accountId = createAccount();
-        OffsetDateTime start = OffsetDateTime.parse("2026-08-10T00:00:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-08-20T00:00:00Z");
-        long oldCredit = createMovement(accountId, MovementType.CREDIT, start.minusDays(1), "1.00");
-        long credit = createMovement(accountId, MovementType.CREDIT, start.plusDays(1), "2.00");
-        long debit = createMovement(accountId, MovementType.DEBIT, start.plusDays(2), "3.00");
+        long oldCredit = createMovement(accountId, MovementType.CREDIT, NOW.minusDays(5), "1.00");
+        long credit = createMovement(accountId, MovementType.CREDIT, NOW.minusHours(2), "2.00");
+        long debit = createMovement(accountId, MovementType.DEBIT, NOW.minusHours(1), "3.00");
 
-        AccountMovementPageResponse credits = list(accountId, "type", "CREDIT");
+        AccountMovementPageResponse credits = list(accountId, "period", "1w", "type", "CREDIT");
         AccountMovementPageResponse debits = list(accountId, "type", "DEBIT");
-        AccountMovementPageResponse combined = list(
-                accountId, "start", start.toString(), "end", end.toString(), "type", "CREDIT");
+        AccountMovementPageResponse combined = list(accountId, "period", "1d", "type", "CREDIT");
 
         assertThat(credits.content()).extracting(AccountMovementResponse::id).containsExactly(credit, oldCredit);
         assertThat(debits.content()).extracting(AccountMovementResponse::id).containsExactly(debit);
@@ -144,29 +154,22 @@ class AccountMovementListingFunctionalTest {
         assertThat(missing.getBody()).isNotNull();
         assertThat(missing.getBody().getDetail()).isEqualTo("The requested account does not exist.");
         assertBadRequest(accountId, "page", "-1");
-        assertBadRequest(accountId, "start", "not-a-date");
+        assertBadRequest(accountId, "period", "30d");
+        assertBadRequest(accountId, "period", "1m");
         assertBadRequest(accountId, "type", "UNKNOWN");
-        assertBadRequest(
-                accountId,
-                "start", "2026-08-20T00:00:00Z",
-                "end", "2026-08-20T00:00:00Z");
-        assertBadRequest(
-                accountId,
-                "start", "2026-08-21T00:00:00Z",
-                "end", "2026-08-20T00:00:00Z");
     }
 
     /** Proves repeated reads leave every fixture row and financial value unchanged. */
     @Test
     void shouldNotMutateFinancialStateWhileListing() {
         long accountId = createAccount();
-        createMovement(accountId, MovementType.CREDIT, OffsetDateTime.parse("2026-08-20T12:00:00Z"), "5.00");
-        createMovement(accountId, MovementType.DEBIT, OffsetDateTime.parse("2026-08-21T12:00:00Z"), "2.00");
+        createMovement(accountId, MovementType.CREDIT, NOW.minusHours(2), "5.00");
+        createMovement(accountId, MovementType.DEBIT, NOW.minusHours(1), "2.00");
         List<Map<String, Object>> before = movementSnapshot(accountId);
 
         list(accountId);
         list(accountId, "type", "CREDIT");
-        list(accountId, "start", "2026-08-01T00:00:00Z", "end", "2026-09-01T00:00:00Z");
+        list(accountId, "period", "1M");
 
         assertThat(movementSnapshot(accountId)).isEqualTo(before);
     }
@@ -229,5 +232,16 @@ class AccountMovementListingFunctionalTest {
                 ORDER BY id
                 """,
                 accountId);
+    }
+
+    @TestConfiguration
+    static class FixedClockConfiguration {
+
+        /** Supplies one stable request instant so period boundaries remain exact in the real application flow. */
+        @Bean
+        @Primary
+        Clock movementTestClock() {
+            return Clock.fixed(Instant.parse("2026-09-01T12:00:00Z"), ZoneOffset.UTC);
+        }
     }
 }

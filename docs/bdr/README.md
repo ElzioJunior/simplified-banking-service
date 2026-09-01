@@ -20,3 +20,4 @@ Start from [the BDR template](BDR-template.md) and maintain an index below.
 - [BDR-0003 — Account-to-Account Transfer Business Rules](BDR-0003-account-to-account-transfer-business-rules.md)
 - [BDR-0004 — Successful Transfer Notification Policy](BDR-0004-successful-transfer-notification-policy.md)
 - [BDR-0005 — Use Best-Effort Transfer Notifications](BDR-0005-use-best-effort-transfer-notifications.md)
+- [BDR-0006 — Use Fixed Lookback Periods for Movement Queries](BDR-0006-use-fixed-lookback-periods-for-movement-queries.md)
