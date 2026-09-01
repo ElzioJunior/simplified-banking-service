@@ -1,4 +1,4 @@
-# EPIC003 — Account Movement Listing
+# EPIC004 — Account Movement Listing
 
 ## Objective
 
@@ -16,7 +16,7 @@ transfer state.
 
 Planned. This Epic defines the requested behavior and user stories; no
 production implementation is included yet. Delivery sequencing and validation
-are defined in the [EPIC003 execution plan](EPIC003-execution-plan.md).
+are defined in the [EPIC004 execution plan](EPIC004-execution-plan.md).
 
 ---
 

@@ -9,7 +9,8 @@ This is the single execution report for all epic execution plans.
 | EPIC000 — Core Database Schema | [Plan](EPIC000-execution-plan.md) | Completed | Migration and 6 real PostgreSQL tests passed |
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
-| EPIC003 — Account Movement Listing | [Plan](EPIC003-execution-plan.md) | Planned | Awaiting development authorization |
+| EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Planned | Awaiting development authorization |
+| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | Planned | Awaiting development authorization |
 
 ## Completed foundation work
 
@@ -201,6 +202,48 @@ schema-quality tool is configured.
 
 ### Planned scope
 
+Reclassify complete application/PostgreSQL Testcontainers scenarios as isolated
+functional tests, keep PostgreSQL real and guarded, and mock
+`TransferNotificationPublisher` in transfer flows. Preserve exactly one
+opt-in integrated class that verifies the production publisher, AMQP topology,
+routing, serialization, and consumption against disposable RabbitMQ without
+starting PostgreSQL or executing a financial transfer.
+
+### Delivery order
+
+1. Supersede the conflicting proposed test ADRs and align the engineering
+   standard, workflow, and test skills with the approved boundary taxonomy.
+2. Move the account, migration, and transfer PostgreSQL scenarios into the
+   isolated source set and align Maven lifecycle behavior.
+3. Replace RabbitMQ in transfer flows with a publisher mock and verify exact
+   event interactions for completion, replay, and rejection.
+4. Add the single narrow RabbitMQ publisher/topology integration scenario.
+5. Run all affected gates and synchronize developer and delivery documentation.
+
+### Decisions and risks
+
+The application and its disposable owned PostgreSQL database form the isolated
+functional environment. RabbitMQ is not started or contacted by those flows;
+application intent is proven at the publisher boundary, while unit tests retain
+retry evidence and one real-broker test retains adapter compatibility evidence.
+Full `verify` will require Docker and take longer. Datasource guards, unique
+fixtures, scoped assertions, and whole-container disposal remain mandatory;
+tests never clear tables or connect to a shared database.
+
+### Validation and authorization boundaries
+
+`clean test` remains process-local. `clean verify` will execute MVC slices and
+complete PostgreSQL-backed isolated flows. The opt-in integrated profile will
+add the single RabbitMQ adapter scenario. Both containers are local,
+test-owned, and disposable, so no consequential Workflow 05 pause is expected.
+The change requires a superseding ADR and coordinated testing-standard,
+workflow, skill, Maven, README, and reporting updates; product behavior, APIs,
+production runtime, and the logical data model remain unchanged.
+
+## Active plan: EPIC004
+
+### Planned scope
+
 Deliver only the read-only
 `GET /api/v1/accounts/{accountId}/movements` endpoint with zero-based,
 fixed-10-item pagination, deterministic newest-first ordering, and optional
@@ -217,14 +260,15 @@ dependency, RabbitMQ change, or Gatling scenario is included.
 2. Add MapStruct mappings, API records, the thin versioned controller, safe
    errors, bounded movement-list metrics, and isolated MVC tests.
 3. Add mock-free HTTP/PostgreSQL pagination and filter scenarios using the
-   guarded disposable integrated environment without clearing tables.
+   guarded disposable isolated environment established by EPIC003 without
+   clearing tables.
 4. Run quality gates and independent review, apply findings, synchronize
    documentation, and finalize delivery.
 
 ### Decisions and risks
 
 BDR-0002 supplies account scope, the 10-item limit, optional date range, and
-`CREDIT`/`DEBIT` filters. EPIC003 fixes `[start, end)` range semantics,
+`CREDIT`/`DEBIT` filters. EPIC004 fixes `[start, end)` range semantics,
 zero-based pages, newest-first `createdAt`/`id` ordering, and a custom response
 envelope so persistence and Spring Data types do not leak into the API. Flyway
 V1 and the logical model already support the query; pagination correctness,
@@ -234,32 +278,34 @@ boundary remains unchanged and is unsuitable for untrusted-network exposure.
 
 ### Validation and authorization boundaries
 
-Default `test` and `verify` remain infrastructure-independent and enforce the
-90% eligible-line coverage gate. The integrated profile adds real HTTP and
-PostgreSQL evidence for ownership, pagination, ordering, every supported filter
-combination, empty results, errors, and read-only behavior. It uses only a
-guarded disposable local Testcontainer, unique fixtures, and whole-container
-cleanup, so no consequential Workflow 05 pause is expected. RabbitMQ and
-Gatling are outside this read-only feature.
+Default `test` remains process-local and enforces the eligible-line coverage
+gate. After EPIC003, `verify` adds real HTTP and disposable PostgreSQL evidence
+for ownership, pagination, ordering, every supported filter combination, empty
+results, errors, and read-only behavior. The isolated suite uses unique
+fixtures and whole-container cleanup, so no consequential Workflow 05 pause is
+expected. EPIC004 adds no RabbitMQ, integrated, or Gatling scenario.
 
 ## Source control
 
 EPIC001 and EPIC002 were delivered in coherent non-destructive commits. EPIC003
-planning artifacts remain in the worktree for review. If EPIC003 development is
-authorized, coherent non-destructive commits and pushes for its planned slices,
-quality/review fixes, integrated verification, and finalization are included.
-Unrelated worktree changes remain outside EPIC003 commits. Amend, squash,
-force-push, history rewriting, pull request creation, merge, deployment, and
-release remain excluded unless separately requested.
+and EPIC004 planning artifacts remain in the worktree for review. Authorization
+for either Epic covers coherent non-destructive commits and pushes for only its
+planned slices, quality/review fixes, applicable verification, and
+finalization. Unrelated worktree changes remain outside those commits. Amend,
+squash, force-push, history rewriting, pull request creation, merge,
+deployment, and release remain excluded unless separately requested.
 
 ## Authorization
 
 Historical EPIC001 and EPIC002 development and Gatling authorizations are
-complete. EPIC003 development is not yet authorized. Once granted, development
-authorization covers the approved implementation, normal quality and review
-fix loops, disposable local integrated tests, documentation synchronization,
-and normal non-destructive commits and pushes. No separate Gatling or
-consequential real-boundary authorization is planned for EPIC003.
+complete. EPIC003 and EPIC004 development are not yet authorized. EPIC003 must
+complete before EPIC004 implements PostgreSQL-backed functional scenarios so
+the new source-set convention is available. Once granted for an Epic,
+development authorization covers its approved implementation, normal quality
+and review fix loops, disposable local test execution, documentation
+synchronization, and normal non-destructive commits and pushes. No separate
+Gatling or consequential real-boundary authorization is planned for either
+Epic.
 
 ## EPIC002 implementation checkpoint
 
@@ -324,5 +370,12 @@ documentation are complete.
 
 Authorize execution of [EPIC003](EPIC003-execution-plan.md) as scoped above,
 including implementation, configured quality gates, review and fixes,
-disposable local integrated tests, documentation finalization, and normal
-non-destructive commits and pushes.
+disposable local PostgreSQL and RabbitMQ tests, documentation finalization, and
+normal non-destructive commits and pushes.
+
+## EPIC004 development authorization request
+
+After EPIC003 completes, authorize execution of
+[EPIC004](EPIC004-execution-plan.md) as scoped above, including implementation,
+configured quality gates, review and fixes, disposable local PostgreSQL tests,
+documentation finalization, and normal non-destructive commits and pushes.

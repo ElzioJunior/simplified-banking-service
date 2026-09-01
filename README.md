@@ -191,7 +191,8 @@ best-effort notifications; the superseded outbox records remain as history.
 - [Development execution report](docs/epics/execution-report.md)
 - [Account creation epic](docs/epics/EPIC001-account-creation.md)
 - [Account-to-account transfer epic](docs/epics/EPIC002-account-to-account-transfer.md)
-- [Account movement listing epic](docs/epics/EPIC003-account-movement-listing.md)
+- [Functional test suite simplification epic](docs/epics/EPIC003-functional-test-suite-simplification.md)
+- [Account movement listing epic](docs/epics/EPIC004-account-movement-listing.md)
 - [Business decision records](docs/bdr/README.md)
 - [Architecture decision records](docs/adr/README.md)
 - [Logical data model](docs/database/logical-data-model.md)
@@ -233,142 +234,14 @@ rollback, idempotency, and concurrency:
 Integrated tests verify that their PostgreSQL target is ephemeral and never
 clear database tables. Docker must be available for this profile.
 
-### Run and debug Gatling load tests
+### Run Gatling load tests
 
-Gatling simulations are opt-in and generate real accounts, transfers, database
-rows, and RabbitMQ messages. Never point them at the normal development database
-or a shared, staging, production, or production-like environment. The examples
-below create a separate Compose project with dedicated containers, ports, and
-volumes; the simulations never clear database tables.
-
-#### 1. Start dedicated load-test infrastructure
-
-From the repository root, start a second PostgreSQL and RabbitMQ stack:
+With the dedicated load-test environment configured through the
+`TRANSFER_LOAD_*` variables in `.env.example`, run:
 
 ```bash
-POSTGRES_DB=simplified_banking_load \
-POSTGRES_USER=simplified_banking_load \
-POSTGRES_PASSWORD=simplified_banking_load \
-POSTGRES_PORT=5433 \
-RABBITMQ_USERNAME=simplified_banking_load \
-RABBITMQ_PASSWORD=simplified_banking_load \
-RABBITMQ_PORT=5673 \
-RABBITMQ_MANAGEMENT_PORT=15673 \
-docker compose -p simplified-banking-load up -d --wait postgres rabbitmq
+./mvnw -B -ntp -Pload-tests gatling:test
 ```
-
-The `-p simplified-banking-load` project name is required: it prevents this
-stack from sharing the normal development containers or volumes.
-
-#### 2. Start the application against the dedicated stack
-
-Keep this process running in its own terminal:
-
-```bash
-SERVER_PORT=18080 \
-DATABASE_URL=jdbc:postgresql://localhost:5433/simplified_banking_load \
-DATABASE_USERNAME=simplified_banking_load \
-DATABASE_PASSWORD=simplified_banking_load \
-RABBITMQ_HOST=localhost \
-RABBITMQ_PORT=5673 \
-RABBITMQ_USERNAME=simplified_banking_load \
-RABBITMQ_PASSWORD=simplified_banking_load \
-./mvnw spring-boot:run
-```
-
-Wait until the application reports that it started on port `18080` before
-starting Gatling.
-
-#### 3. Create an IntelliJ Run/Debug configuration
-
-1. Open the **Maven** tool window, activate the `load-tests` profile under
-   **Profiles**, and reload the Maven project. This makes IntelliJ index
-   `src/test/gatling/java` and the Gatling dependencies.
-2. Open **Run > Edit Configurations**.
-3. Select **+ > Maven**.
-4. Set **Name** to `Gatling - Hot source`.
-5. Set **Working directory** to `$PROJECT_DIR$`.
-6. Set **Run** or **Command line** to:
-
-   ```text
-   -Pload-tests gatling:test -Dgatling.sameProcess=true -Dgatling.simulationClass=com.elziojunior.simplifiedbankingservice.load.HotSourceTransferSimulation
-   ```
-
-7. Select Java 21 as the JRE.
-8. Under **Modify options > Add VM options**, add:
-
-   ```text
-   --add-opens=java.base/java.lang=ALL-UNNAMED
-   ```
-
-9. Under **Modify options > Environment variables**, add:
-
-   | Variable | Local debug value |
-   | --- | --- |
-   | `TRANSFER_LOAD_ENVIRONMENT` | `dedicated-load-test` |
-   | `TRANSFER_LOAD_BASE_URL` | `http://localhost:18080` |
-   | `TRANSFER_LOAD_RATE` | `1` |
-   | `TRANSFER_LOAD_DURATION_SECONDS` | `10` |
-   | `TRANSFER_LOAD_DESTINATIONS` | `2` |
-   | `TRANSFER_LOAD_DATABASE_URL` | `jdbc:postgresql://localhost:5433/simplified_banking_load` |
-   | `TRANSFER_LOAD_DATABASE_USERNAME` | `simplified_banking_load` |
-   | `TRANSFER_LOAD_DATABASE_PASSWORD` | `simplified_banking_load` |
-
-   `.env.example` is a reference file and is not loaded automatically by
-   IntelliJ. Enter these variables in the Run/Debug configuration.
-
-10. Place breakpoints in the simulation or `TransferLoadSupport` and select
-   **Debug**. `gatling.sameProcess=true` is required so Gatling runs in the JVM
-   to which IntelliJ attaches the debugger.
-
-Use the low rate and duration above while stepping through code. A suspended
-thread changes request timing, so use normal non-debug load runs and Gatling
-reports to evaluate latency, throughput, timeouts, and lock contention.
-
-To debug the distributed scenario, duplicate the configuration, name it
-`Gatling - Distributed`, and replace the simulation class with:
-
-```text
-com.elziojunior.simplifiedbankingservice.load.DistributedTransferSimulation
-```
-
-The same simulations can be run without the debugger by exporting the
-`TRANSFER_LOAD_*` values documented in `.env.example` and running:
-
-```bash
-./mvnw -Pload-tests gatling:test \
-  -Dgatling.simulationClass=com.elziojunior.simplifiedbankingservice.load.HotSourceTransferSimulation
-```
-
-Gatling writes the HTML report under `target/gatling/` after a completed run.
-
-#### Troubleshooting
-
-- Unresolved Gatling imports or inactive breakpoints: activate the Maven
-  `load-tests` profile and reload the project.
-- `TRANSFER_LOAD_* is required for authorized load execution`: add the missing
-  variable to the Run/Debug configuration; `.env.example` is not loaded by the
-  IDE.
-- `Fixture API is unavailable`: confirm that the dedicated application is still
-  running at `http://localhost:18080`.
-- `Post-run consistency access is unavailable`: confirm that PostgreSQL is
-  running on port `5433` and that the database URL and credentials match the
-  dedicated stack.
-- A breakpoint is not reached: confirm that the command contains
-  `-Dgatling.sameProcess=true` and that the configuration was started with
-  **Debug**, not **Run**.
-
-#### 4. Remove the dedicated environment
-
-Stop the application process first. Then remove only the dedicated load-test
-containers and their volumes:
-
-```bash
-docker compose -p simplified-banking-load down --volumes
-```
-
-This removes the whole disposable load-test database instead of clearing tables
-and does not affect the normal Compose project.
 
 ### Run locally
 

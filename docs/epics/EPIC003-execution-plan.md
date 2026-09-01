@@ -2,174 +2,160 @@
 
 ## Preconditions and decisions
 
-- Scope is limited to the read-only
-  `GET /api/v1/accounts/{accountId}/movements` contract defined by
-  [EPIC003](EPIC003-account-movement-listing.md) and
-  [BDR-0002](../bdr/BDR-0002-financial-movement-query-rules.md).
-- The endpoint returns only movements owned by the account in the path. It does
-  not return balances or modify account, movement, token, transfer, or
-  notification state.
-- Pagination is zero-based with page `0` as the default and a fixed maximum of
-  10 items. There is no client-selected page size.
-- Optional `start` and `end` filters use offset-bearing ISO 8601 date/time
-  values. `start` is inclusive, `end` is exclusive, and a supplied range must
-  have `start` before `end`.
-- The optional public movement types are exactly `CREDIT` and `DEBIT`, matching
-  the existing persistence enum and database constraint. No translation to
-  additional public values is planned.
-- Results use deterministic newest-first ordering by `createdAt DESC`, followed
-  by movement `id DESC` as a tie-breaker.
-- The custom response envelope contains `content`, `page`, `size`,
-  `totalElements`, and `totalPages`; persistence entities and Spring Data page
-  implementations are not exposed through the HTTP contract.
-- An existing account with no matching movements returns an empty `200 OK`
-  page. A missing account returns `404`; invalid page, date/time, range, or type
-  input returns safe RFC 9457 Problem Details with `400`.
-- `/api/v1/**` remains temporarily unauthenticated under
-  [ADR-0027](../adr/ADR-0027-defer-api-authentication-for-the-initial-scope.md).
-  EPIC003 does not expand or redesign authentication.
-- Flyway V1 already stores every required field and includes account/date and
-  account/type/date indexes. The logical model already requires this query
-  path, so no migration or logical data-model change is planned.
-- Existing Spring MVC, validation, Spring Data JPA, MapStruct, Micrometer, and
-  Testcontainers dependencies are sufficient. No new dependency is planned.
-- The decision register contains no open decision blocking this scope.
+- Scope is limited to the test taxonomy and suite restructuring defined by
+  [EPIC003](EPIC003-functional-test-suite-simplification.md). Production
+  behavior and contracts must remain unchanged.
+- A complete functional test may start the real application and its owned,
+  disposable PostgreSQL infrastructure while remaining isolated from external
+  applications and messaging systems.
+- PostgreSQL-backed functional tests may require Docker and belong to the
+  isolated lifecycle. They must retain the exact-container datasource guard,
+  unique fixtures, scoped assertions, and whole-container disposal without
+  table clearing.
+- RabbitMQ is replaced by a mocked `TransferNotificationPublisher` in transfer
+  functional scenarios. The mock verifies application intent; it does not
+  claim broker delivery.
+- One focused opt-in integration test owns the real RabbitMQ compatibility
+  evidence. It exercises the production publisher, topology, routing, and JSON
+  conversion without PostgreSQL or a complete transfer flow.
+- Existing publisher unit tests remain responsible for deterministic retry and
+  failure-exhaustion branches.
+- ADR-0017 and ADR-0018 currently express the superseded taxonomy. A new ADR
+  must explicitly supersede them before the implementation slice is considered
+  complete; accepted history must not be rewritten.
+- The testing standard, build configuration, workflows, skills, README, and
+  delivery artifacts must be updated together so no conflicting convention
+  remains.
+- No BDR, product document, logical data-model, Flyway migration, production
+  dependency, or production configuration change is required.
 
 ## Acceptance criteria
 
-- `GET /api/v1/accounts/{accountId}/movements` returns only movements belonging
-  to the requested existing account.
-- The default request returns page zero with at most 10 items.
-- Later pages return the corresponding non-overlapping slice in deterministic
-  newest-first order.
-- `start`, `end`, `type=CREDIT`, and `type=DEBIT` work independently and in
-  combination.
-- Date/time range boundaries are applied as `[start, end)`.
-- Empty matches return `200 OK` with empty content and zero totals.
-- Unknown accounts return safe `404` Problem Details.
-- Negative page values, malformed dates, invalid/equal/reversed ranges, and
-  unsupported movement types return safe `400` Problem Details.
-- The endpoint is read-only and does not mutate financial data.
-- API metrics record the movement-list operation with bounded cardinality and
-  no account, movement, operation, amount, or date value as a metric tag.
-- Existing account creation, transfer, notification, migration, and security
-  behavior remains unchanged.
+- `src/test/integrated/java` contains exactly one test class, focused on the
+  RabbitMQ publisher and AMQP topology.
+- Account, migration/constraint, and transfer application flows reside under
+  `src/test/isolated/java` and use the `*FunctionalTest` suffix.
+- Transfer functional tests start PostgreSQL but neither start nor contact
+  RabbitMQ.
+- Successful, replayed, and rejected transfer scenarios verify the correct
+  `TransferNotificationPublisher` interactions and captured event data.
+- The RabbitMQ integration scenario starts no PostgreSQL container and proves
+  that a published `TransferCompletedNotification` can be consumed unchanged
+  from the configured queue.
+- Default unit execution remains Docker-free. Full isolated verification may
+  require Docker for PostgreSQL and reports that prerequisite explicitly.
+- The integrated profile remains opt-in and adds RabbitMQ compatibility
+  verification.
+- No scenario clears tables or can resolve to the application's transactional
+  or another shared database.
+- Existing unit, functional, migration, concurrency, messaging, and coverage
+  assertions remain equivalent or stronger after reclassification.
 
 ## Ordered slices
 
-1. **Persistence query and read-only application use case.** Extend
-   `MovementRepository` with one pageable account-scoped query whose optional
-   predicates cover `start`, `end`, and `MovementType`. Reuse
-   `AccountRepository` to distinguish an absent account from an empty movement
-   history. Add purpose-specific input, item, and page DTOs under `model.dto`
-   and a `@Transactional(readOnly = true)` listing service that validates the
-   range, enforces the fixed page size and deterministic sort, invokes the
-   repository, and maps results without initializing the lazy Account graph.
-   Unit tests cover default pagination, later pages, every filter combination,
-   ordering, empty content, unknown accounts, invalid ranges, and collaborator
-   non-invocation after validation failure.
-2. **Versioned HTTP contract, mapping, errors, and metrics.** Add the account
-   movement filter and response records under `model.api`, plus a MapStruct
-   mapper under `model.mapper` for API-to-DTO and DTO-to-response conversion.
-   Add a thin movement-list controller under `api`, extend centralized Problem
-   Details translation for query validation and absent accounts, and add
-   `movement.list` to the existing bounded API metrics operations. Unit and
-   isolated MockMvc tests cover the exact response envelope, default values,
-   ISO 8601 parsing, all supported filters, combined filters, empty pages,
-   `400`/`404`, metrics, unauthenticated access, and rejection of unsupported
-   methods without exposing persistence or financial details.
-3. **Mock-free PostgreSQL verification.** Add an opt-in
-   `AccountMovementListingIntegratedFunctionalTest` using the real random-port
-   application, Flyway V1–V3, and a disposable PostgreSQL 17.6 Testcontainer.
-   Create uniquely identifiable accounts and movement fixtures without clearing
-   tables. Verify ownership isolation, more-than-10-item pagination,
-   deterministic order including equal timestamps, both date boundaries,
-   `CREDIT`, `DEBIT`, combined filters, empty results, invalid input, unknown
-   accounts, and unchanged persisted rows after reads.
-4. **Quality, review, and documentation completion.** Run configured quality
-   gates, review scope, query behavior, lazy-loading safety, API exposure,
-   sensitive-data handling, and unnecessary complexity. Apply findings, rerun
-   affected checks, then synchronize EPIC003, the README, and the shared
-   execution report with actual implementation and validation evidence.
+1. **Superseding decision and canonical test standard.** Add a new ADR that
+   explicitly supersedes ADR-0017 and ADR-0018 with the approved test-boundary
+   taxonomy. Update `docs/engineering/testing-standards.md`, Workflow 05, and
+   the applicable test skills so isolated functional tests may use guarded
+   disposable PostgreSQL, integrated tests remain opt-in for real adapter or
+   external-system compatibility, and commands/prerequisites remain explicit.
+2. **PostgreSQL-backed isolated source set.** Move and rename the account
+   creation and database migration suites, plus `EphemeralPostgresGuard`, into
+   `src/test/isolated/java`. Move the non-messaging transfer scenarios into the
+   same source set. Adjust Maven includes, excludes, source sets, and lifecycle
+   documentation so `test` stays process-local and `verify` executes all
+   isolated scenarios with a clear Docker prerequisite.
+3. **Mocked notification boundary in transfer flows.** Replace the transfer
+   suite's RabbitMQ container and `RabbitTemplate` consumption with a Spring
+   mock of `TransferNotificationPublisher`. Capture the event on a new
+   completion and verify its exact values and single invocation. Verify no
+   publication for rejected operations and no additional publication for an
+   identical replay. Prevent the isolated application context from attempting
+   AMQP topology declaration or a background broker connection.
+4. **Single RabbitMQ integration test.** Add one
+   `TransferNotificationPublisherIntegratedFunctionalTest` using only a
+   disposable RabbitMQ Testcontainer and the smallest production AMQP context.
+   Publish a deterministic notification, consume it from the configured queue,
+   and assert all stable fields. Keep retry/exhaustion tests process-local and
+   avoid duplicating business-flow assertions.
+5. **Quality, review, and documentation completion.** Run the process-local,
+   isolated PostgreSQL, and opt-in RabbitMQ lifecycles; verify source-set
+   membership and absence of unintended Rabbit connections; review safety,
+   concurrency evidence, wiring, and coverage; apply findings and rerun
+   affected checks. Synchronize the README, engineering and agent guidance,
+   EPIC003, renumbered EPIC004 references, and the shared execution report with
+   actual results.
 
 ## Expected components and documentation
 
-- `src/main/java/.../repository/MovementRepository.java` — one pageable,
-  account-scoped filtered query.
-- `src/main/java/.../service/` — cohesive read-only movement listing use case.
-- `src/main/java/.../model/dto/` — listing input, movement item, and page DTOs.
-- `src/main/java/.../model/api/` — query/filter and response records.
-- `src/main/java/.../model/mapper/` — MapStruct boundary mappings.
-- `src/main/java/.../api/` — thin versioned listing controller and safe error
-  translation integration.
-- `src/main/java/.../metrics/ApiOperation.java` — bounded `movement.list`
-  operation tag.
-- `src/test/unit/java/.../` — service, mapper, controller, metrics, and error
-  scenarios.
-- `src/test/isolated/java/.../` — isolated MVC contract scenarios.
-- `src/test/integrated/java/.../` — mock-free HTTP/PostgreSQL listing scenarios.
-- `docs/epics/EPIC003-account-movement-listing.md`, this plan, the README, and
-  the shared execution report — planned and final public documentation.
-- No Flyway migration, new dependency, entity relationship, RabbitMQ behavior,
-  Gatling simulation, write use case, or additional filter is included.
-
-The repository query, listing service, mapper methods that transform page
-content, controller orchestration, and exception translation will receive
-JavaDoc stating what each boundary does and why it exists. Every application-
-owned record property will have concise property documentation. Every new or
-changed test method will state the behavior it proves and why that scenario
-matters. The fixed page size, `[start, end)` range semantics, deterministic
-ordering, absent-account distinction, and read-only behavior will remain
-documented next to their smallest relevant code boundaries.
+- `pom.xml` — source-set membership, naming filters, and lifecycle behavior.
+- `src/test/isolated/java/...` — MVC slices plus complete account, schema, and
+  transfer functional scenarios using disposable PostgreSQL where applicable.
+- `src/test/integrated/java/...` — one RabbitMQ publisher/topology scenario.
+- `src/test/unit/java/.../TransferNotificationPublisherTest.java` — unchanged
+  ownership of retry and exhausted-failure branches, with focused adjustments
+  only if review finds a coverage gap.
+- `docs/adr/` — one superseding test-boundary ADR and updated index.
+- `docs/engineering/testing-standards.md` — canonical recurring conventions and
+  prerequisites.
+- `.agents/workflows/05-integrated-functional-tests.md` and relevant test skills
+  — workflow terminology and execution behavior aligned with the standard.
+- `README.md`, this Epic, its execution plan, and `execution-report.md` —
+  developer commands, scope, authorization, and final evidence.
 
 ## Quality strategy
 
-- `./mvnw -B -ntp clean test` — process-local unit tests.
-- `./mvnw -B -ntp clean verify` — unit plus isolated functional tests and the
-  at-least-90% eligible line-coverage gate without Docker or another external
-  process.
-- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — existing
-  regression suites plus real movement-list HTTP/PostgreSQL scenarios.
+- `./mvnw -B -ntp clean test` — process-local unit tests and the configured
+  eligible-line coverage instrumentation without Docker.
+- `./mvnw -B -ntp clean verify` — unit, MVC slice, and complete isolated
+  functional scenarios against disposable PostgreSQL; Docker is required.
+- `./mvnw -B -ntp clean -Pintegrated-functional-tests verify` — the preceding
+  gates plus the single real RabbitMQ publisher/topology integration scenario.
+- A focused Maven invocation for the RabbitMQ class verifies that it starts no
+  PostgreSQL container and does not depend on transfer fixtures.
 - `docker compose config --quiet` — unchanged local infrastructure validity.
-- Review verifies fixed pagination, deterministic ordering, optional-filter
-  combinations, safe errors, no entity exposure, no N+1/lazy graph loading, no
-  sensitive logging or metric tags, unchanged write behavior, and absence of
-  speculative filters or abstractions.
+- `git diff --check` and repository link/reference searches validate the
+  documentation and EPIC003/EPIC004 renumbering.
+- Review verifies that no business assertion was dropped, the publisher mock is
+  reset and verified per scenario, concurrency remains deterministic, AMQP is
+  never contacted by isolated tests, and database safety guards remain intact.
 - No lint, static-analysis, dependency/security scanner, or standalone schema
   quality tool is currently configured; the plan does not claim an absent gate.
 
 ## Integrated strategy
 
-The integrated suite will reuse the opt-in profile and its guarded disposable
-PostgreSQL Testcontainer. Scenarios will create unique account and movement
-fixtures and scope every assertion to those identifiers. Tests will never
-truncate, bulk-delete, clean Flyway, drop schemas, or connect to the
-transactional development database; the whole disposable container is
-discarded after the suite.
+The integrated suite contains one local infrastructure-adapter scenario. It
+starts a disposable RabbitMQ container, loads the production notification
+exchange, queue, binding, message converter, and publisher, publishes one
+deterministic event, and consumes the routed value with bounded polling. It
+does not start the complete banking application, PostgreSQL, or a real consumer
+application and does not claim downstream business delivery.
 
-The production controller, mapper, service, repository, JPA mapping, security
-chain, serialization, and Flyway history will run without mocks. RabbitMQ is not
-part of this read-only boundary and no Gatling execution is planned. The local
-container and random-port HTTP server have no shared state, credentials, cost,
-or consequential external effect, so no Workflow 05 authorization pause is
-expected after development authorization.
+The broker has no shared state, credential, cost, or production-like effect and
+is discarded whole after the suite. Therefore no consequential Workflow 05
+authorization pause is expected after development authorization. Any future
+test against a real external application remains separately opt-in and must
+define its environment, credentials, effects, cleanup, and authorization
+boundary.
 
 ## Source-control behavior
 
 Development authorization will cover coherent non-destructive commits and
-pushes for the planned slices, quality/review fixes, integrated verification,
-and final documentation. Stage only EPIC003 files and preserve unrelated
-worktree changes. Amend, squash, force-push, pull request creation, merge,
-deployment, and release remain excluded unless separately requested.
+pushes for the planned slices, quality/review fixes, and final documentation.
+Stage only EPIC003 implementation files and preserve unrelated worktree
+changes. Amend, squash, force-push, history rewriting, pull request creation,
+merge, deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
 - Status: planned; awaiting development authorization.
-- Completed work: EPIC003 scope, user stories, decision-impact analysis, and
-  this execution plan.
-- Implementation, tests, integrated execution, review, commits, and pushes:
-  not started.
-- Decision impact: no new BDR, ADR, engineering standard, logical data-model
-  update, Flyway migration, or dependency is required.
-- Expected integrated boundary: local disposable PostgreSQL only; no
-  consequential real-boundary authorization gate is expected.
+- Completed work: EPIC003 scope, approved test-boundary direction,
+  decision-impact analysis, and this execution plan.
+- Implementation, superseding ADR, standards update, test moves, execution,
+  review, commits, and pushes: not started.
+- Decision impact: one superseding ADR and coordinated engineering-standard,
+  workflow, skill, Maven, README, and delivery-document updates are required.
+- Product, API, production runtime, business behavior, and logical data model:
+  unchanged.
+- Expected integrated boundary: one disposable local RabbitMQ Testcontainer;
+  no consequential real-boundary authorization gate is expected.
