@@ -82,8 +82,8 @@ best-effort notifications; the superseded outbox records remain as history.
   partial financial effects under concurrent requests.
 - Record each successful transfer as one debit and one credit movement sharing
   the same operation identifier.
-- List one account's movements in fixed pages of 10 with optional date range
-  and `CREDIT`/`DEBIT` filters.
+- List one account's recent movements in fixed pages of 10 with `1d`, `1w`, or
+  `1M` lookback periods and optional `CREDIT`/`DEBIT` filters.
 - Lock transfer accounts in ascending ID order inside one `READ_COMMITTED`
   transaction with a configurable lock timeout.
 - Request synchronous best-effort publication of a `TRANSFER_COMPLETED` event
@@ -304,8 +304,8 @@ The implemented delivery includes:
 - Flyway V1 accounts/movements, V2 transfer-idempotency history, and V3 outbox
   removal.
 - Account creation with validation and monetary normalization.
-- Read-only account movement history with fixed pagination and optional date
-  and movement-type filters.
+- Read-only account movement history with fixed pagination, `1d`/`1w`/`1M`
+  lookback periods, and optional movement-type filtering.
 - Server-issued transfer tokens and idempotent, atomic, pessimistically locked
   transfers.
 - Direct best-effort RabbitMQ transfer-completed events with bounded in-memory

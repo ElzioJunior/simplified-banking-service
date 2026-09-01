@@ -46,7 +46,7 @@ public class AccountMovementController {
      * returns only the approved page contract.
      *
      * @param accountId account whose movements are requested
-     * @param request optional page, range, and type filters
+     * @param request optional page, recent-period, and type filters
      * @return matching movement page
      */
     @GetMapping("/{accountId}/movements")

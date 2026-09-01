@@ -14,8 +14,8 @@ transfer state.
 
 ## Delivery status
 
-Contract revision in progress on 2026-09-01. The original arbitrary date range
-is being replaced by the fixed periods defined in BDR-0006.
+Completed on 2026-09-01, including the contract revision that replaced the
+original arbitrary date range with the fixed periods defined in BDR-0006.
 
 ---
 
@@ -103,9 +103,9 @@ The endpoint remains temporarily unauthenticated under
 - [x] Results are paginated with at most 10 movements per page.
 - [x] Page numbering starts at zero and defaults to the first page.
 - [x] Results are ordered deterministically from newest to oldest.
-- [ ] The client may select only `1d`, `1w`, or `1M`, with `1d` as the default.
+- [x] The client may select only `1d`, `1w`, or `1M`, with `1d` as the default.
 - [x] The client may filter by `CREDIT` or `DEBIT`.
-- [ ] Period and type filters may be combined.
+- [x] Period and type filters may be combined.
 - [x] An empty result returns a successful empty page.
 - [x] An unknown account returns `404 Not Found`.
 - [x] Invalid query parameters return safe Problem Details with `400 Bad Request`.

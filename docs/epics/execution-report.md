@@ -10,7 +10,7 @@ This is the single execution report for all epic execution plans.
 | EPIC001 — Account Creation | [Plan](EPIC001-execution-plan.md) | Completed | API, review, and all configured gates completed |
 | EPIC002 — Account-to-Account Transfer | [Plan](EPIC002-execution-plan.md) | Completed | Local gates and both authorized Gatling simulations passed |
 | EPIC003 — Functional Test Suite Simplification | [Plan](EPIC003-execution-plan.md) | Completed | 54 unit, 30 isolated PostgreSQL, and 1 RabbitMQ integration test passed |
-| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | In progress | Replacing arbitrary dates with fixed lookback periods |
+| EPIC004 — Account Movement Listing | [Plan](EPIC004-execution-plan.md) | Completed | Fixed `1d`/`1w`/`1M` periods; all configured gates passed |
 
 ## Completed foundation work
 
@@ -241,6 +241,27 @@ workflow, skill, Maven, README, and reporting updates; product behavior, APIs,
 production runtime, and the logical data model remain unchanged.
 
 ## Completed plan: EPIC004
+
+### Fixed lookback contract revision
+
+On 2026-09-01, BDR-0006 superseded the original arbitrary `start` and `end`
+contract. The public endpoint now accepts only `period=1d|1w|1M`, defaults to
+`1d`, computes one deterministic half-open window through the application
+clock, and retains optional `CREDIT`/`DEBIT` filtering. The repository no
+longer substitutes a historical sentinel when date input is absent.
+
+Unit tests prove exact day, week, and calendar-month calculations. MVC and
+OpenAPI tests prove the default, all public values, invalid values, type
+combinations, and removal of `start`/`end` from the published contract. Five
+real HTTP/PostgreSQL scenarios prove boundaries, pagination, ownership,
+filtering, safe failures, and read-only behavior without clearing tables.
+
+Final validation passed 68 unit tests, 45 isolated functional tests, the 90%
+eligible-line coverage gate, and the existing single disposable RabbitMQ
+adapter integration test. Docker Compose validation and source-set separation
+also passed. Independent review found no BLOCKER or HIGH issue; its one MEDIUM
+documentation finding was corrected. No new integrated boundary, migration,
+logical data-model change, dependency, or RabbitMQ behavior was introduced.
 
 ### Planned scope
 

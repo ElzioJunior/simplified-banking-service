@@ -201,7 +201,7 @@ deployment, and release remain excluded unless separately requested.
 
 ## Checkpoint
 
-- Status: fixed-lookback contract revision in progress on 2026-09-01.
+- Status: fixed-lookback contract revision completed on 2026-09-01.
 - Completed revision slices: BDR/contract documentation, application and
   repository implementation, unit tests, MVC contract tests, OpenAPI checks,
   and real HTTP/PostgreSQL period scenarios.
@@ -209,8 +209,18 @@ deployment, and release remain excluded unless separately requested.
   lifecycle passed all 68 unit tests and 5 movement scenarios; the focused MVC
   and OpenAPI lifecycle passed all 68 unit tests and 9 isolated scenarios. The
   configured coverage check passed in both `verify` executions.
-- Active next action: run comprehensive quality gates, independent review, and
-  final documentation synchronization.
+- Comprehensive validation: `clean test` passed 68 unit tests; `clean verify`
+  passed 68 unit and 45 isolated functional tests with the coverage gate; the
+  opt-in integrated lifecycle additionally passed the single RabbitMQ adapter
+  regression. `docker compose config --quiet`, source-set separation, and
+  `git diff --check` passed.
+- Independent review found no BLOCKER or HIGH issue. Its one MEDIUM
+  documentation-divergence finding was corrected in both READMEs and the
+  EPIC004 delivery artifacts.
+- Integrated scope: no new consequential boundary applies; the movement flow
+  uses guarded disposable PostgreSQL, while the existing RabbitMQ regression
+  remained unrelated and disposable.
+- Next action: none; the fixed-lookback revision is complete.
 - Original delivery status: completed on 2026-09-01.
 - Completed work: the account-scoped pageable query, read-only service, DTOs,
   public API models, MapStruct mapper, controller, safe errors, bounded

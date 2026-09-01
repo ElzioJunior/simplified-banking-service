@@ -88,8 +88,8 @@ outbox permanecem como histórico.
   perdidas e efeitos financeiros parciais sob requisições concorrentes.
 - Registrar cada transferência bem-sucedida como uma movimentação de débito e
   outra de crédito com o mesmo identificador de operação.
-- Listar as movimentações de uma conta em páginas fixas de 10, com filtros
-  opcionais por intervalo de datas e `CREDIT`/`DEBIT`.
+- Listar as movimentações recentes de uma conta em páginas fixas de 10, com
+  períodos `1d`, `1w` ou `1M` e filtro opcional `CREDIT`/`DEBIT`.
 - Bloquear as contas da transferência em ordem crescente de ID dentro de uma
   transação `READ_COMMITTED`, com timeout configurável.
 - Solicitar a publicação síncrona best effort de um evento
@@ -320,8 +320,8 @@ A entrega implementada inclui:
 - Flyway V1 para contas/movimentações, V2 para o histórico de idempotência e V3
   para remoção do outbox.
 - Criação de contas com validação e normalização monetária.
-- Histórico de movimentações somente leitura, com paginação fixa e filtros
-  opcionais por data e tipo de movimentação.
+- Histórico de movimentações somente leitura, com paginação fixa, períodos
+  `1d`/`1w`/`1M` e filtro opcional por tipo de movimentação.
 - Tokens emitidos pelo servidor e transferências idempotentes, atômicas e com
   bloqueio pessimista.
 - Eventos diretos best effort de transferência concluída via RabbitMQ, com
