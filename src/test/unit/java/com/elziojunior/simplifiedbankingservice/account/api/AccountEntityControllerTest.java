@@ -16,14 +16,14 @@ import org.junit.jupiter.api.Test;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreateAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.CreatedAccountDto;
 import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMapper;
-import com.elziojunior.simplifiedbankingservice.service.CreateAccountService;
+import com.elziojunior.simplifiedbankingservice.service.AccountService;
 
 class AccountEntityControllerTest {
 
     /** Proves the HTTP adapter maps request and result without owning business rules. */
     @Test
     void shouldMapCreationRequestAndResult() {
-        CreateAccountService service = mock(CreateAccountService.class);
+        AccountService service = mock(AccountService.class);
         AccountMapper mapper = mock(AccountMapper.class);
         OffsetDateTime createdAt = OffsetDateTime.parse("2026-08-31T18:45:00Z");
         CreateAccountRequest request = new CreateAccountRequest("Ada", new BigDecimal("12.345"));
@@ -31,7 +31,7 @@ class AccountEntityControllerTest {
         CreatedAccountDto created = new CreatedAccountDto(7L, "Ada", new BigDecimal("12.34"), createdAt);
         AccountResponse expected = new AccountResponse(7L, "Ada", new BigDecimal("12.34"), createdAt);
         when(mapper.toDto(request)).thenReturn(input);
-        when(service.create(input)).thenReturn(created);
+        when(service.createAccount(input)).thenReturn(created);
         when(mapper.toResponse(created)).thenReturn(expected);
         AccountController controller = new AccountController(service, mapper);
 
@@ -39,7 +39,7 @@ class AccountEntityControllerTest {
 
         assertThat(response).isEqualTo(expected);
         verify(mapper).toDto(request);
-        verify(service).create(input);
+        verify(service).createAccount(input);
         verify(mapper).toResponse(created);
     }
 }

@@ -86,13 +86,13 @@ class ApiExceptionHandlerTest {
 
         ProblemDetail malformed = handler.handleTypeMismatch(mismatch);
         ProblemDetail invalid = handler.handleMovementValidation(
-                new AccountMovementValidationException("Start must be before end."));
+                new AccountMovementValidationException("Movement period is required."));
         ProblemDetail missing = handler.handleMovementAccountNotFound(
                 new AccountMovementNotFoundException("The requested account does not exist."));
 
         assertProblem(
                 malformed, HttpStatus.BAD_REQUEST, "Invalid movement query", "The request parameters are invalid.");
-        assertProblem(invalid, HttpStatus.BAD_REQUEST, "Invalid movement query", "Start must be before end.");
+        assertProblem(invalid, HttpStatus.BAD_REQUEST, "Invalid movement query", "Movement period is required.");
         assertProblem(
                 missing, HttpStatus.NOT_FOUND, "Account not found", "The requested account does not exist.");
     }

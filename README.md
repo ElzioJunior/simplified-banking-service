@@ -1,3 +1,5 @@
+[English](README.md) | [Português](README.pt-BR.md)
+
 # Simplified Banking Service
 
 Simplified Banking Service is a Java/Spring Boot REST API for a deliberately
@@ -9,6 +11,60 @@ The service currently implements account creation, server-issued transfer
 idempotency tokens, atomic account-to-account transfers, paginated financial
 movement queries, best-effort RabbitMQ notifications, operational metrics, and
 automated functional and load-test suites.
+
+## Engineering delivery model
+
+I designed this model of [AI agents](AGENTS.md), [workflows](.agents/workflows/README.md), and [skills](.agents/skills/) using the
+experience and software foundations built throughout my career. It accelerates delivery with quality, traceability, and human control at the highest-impact gates.
+
+The solution and delivery process follows this sequence:
+
+1. **Solution design:** understand the problem, product objectives, requirements, flows, constraints, and open decisions.
+2. **Durable decisions:** create BDRs for business and product decisions, ADRs for architecture, and update data or engineering standards when needed.
+3. **Scope organization:** create epics with their user stories, acceptance criteria, and explicit boundaries.
+4. **Execution planning:** create execution plans with ordered slices, risks, test strategy, validations, and resumable checkpoints.
+5. **Workflow execution:** Design and Context → Feature Implementation → Quality Gates → AI Code Review → Integrated Functional
+   Tests → Finalization and Documentation, all governed by the [engineering standards](docs/engineering/README.md) and
+   [Definition of Done](docs/engineering/definition-of-done.md).
+
+Together, these steps keep every change connected to an approved need, supported by objective validation evidence, and subject to
+clear human oversight before consequential actions.
+
+### Public delivery evidence
+
+- **Code review:** a dedicated agent reviews changes in [PR #7](https://github.com/ElzioJunior/simplified-banking-service/pull/7),
+  [PR #6](https://github.com/ElzioJunior/simplified-banking-service/pull/6), and
+  [PR #5](https://github.com/ElzioJunior/simplified-banking-service/pull/5).
+- 🕒 **Product development time:** `14h`, from the
+  [first commit `d088b38`](https://github.com/ElzioJunior/simplified-banking-service/commit/d088b38f46346c21892f3d753a24c9509e4b0478)
+  to the [latest commit `7ef78f4`](https://github.com/ElzioJunior/simplified-banking-service/commit/7ef78f4c740c722e12de90a8e70bf8dd94824280).
+
+## Architecture
+
+- Architecture decisions and their history are indexed in the [Architecture Decision Records](docs/adr/README.md).
+- Java 21 and Spring Boot 3.5.16.
+- Maven with the Maven Wrapper.
+- Spring Web MVC, Bean Validation, Spring Data JPA with Hibernate, MapStruct,
+  and Spring Security.
+- PostgreSQL 17.6 with immutable Flyway migrations. V1 creates accounts and
+  movements, V2 adds transfer idempotency state and the historical outbox, and
+  V3 removes the superseded outbox table.
+- RabbitMQ 4.1.4 for direct transfer-completed event publication.
+- Spring Boot Actuator and Micrometer with Prometheus collection and a
+  provisioned Grafana dashboard for local observability.
+- Springdoc OpenAPI and Swagger UI for generated interactive REST documentation.
+- Docker and Docker Compose for reproducible local environments.
+- A layered monorepo with API, mapper, service, repository, entity, DTO, and
+  configuration boundaries.
+- `BigDecimal` and fixed-precision database types for monetary values.
+- A single `READ COMMITTED` transaction with pessimistic account locking for
+  each transfer.
+- At least 90% unit-test coverage for meaningful application logic, plus
+  isolated, integrated, concurrency, migration, and Gatling load tests.
+
+Decision records have mixed statuses. Accepted records govern idempotency,
+temporary unauthenticated API access, bounded contention failure, and direct
+best-effort notifications; the superseded outbox records remain as history.
 
 ## Implemented capabilities
 
@@ -26,14 +82,16 @@ automated functional and load-test suites.
   partial financial effects under concurrent requests.
 - Record each successful transfer as one debit and one credit movement sharing
   the same operation identifier.
-- List one account's movements in fixed pages of 10 with optional date range
-  and `CREDIT`/`DEBIT` filters.
+- List one account's recent movements in fixed pages of 10 with `1d`, `1w`, or
+  `1M` lookback periods and optional `CREDIT`/`DEBIT` filters.
 - Lock transfer accounts in ascending ID order inside one `READ_COMMITTED`
   transaction with a configurable lock timeout.
 - Request synchronous best-effort publication of a `TRANSFER_COMPLETED` event
   to RabbitMQ after each newly completed transfer commits.
 - Expose operational metrics for throughput, latency, failures, timeouts, and
   lock contention.
+- Publish the versioned REST contract, principal success and validation
+  examples, and an interactive execution surface through OpenAPI and Swagger UI.
 - Validate database migrations, real HTTP/PostgreSQL/RabbitMQ behavior,
   concurrency, and sustained load through separate automated test suites.
 
@@ -52,133 +110,29 @@ automated functional and load-test suites.
 
 ## REST API
 
-Public endpoints are versioned under `/api/v1`.
+Public endpoints are versioned under `/api/v1`. After starting the application,
+use the canonical interactive documentation for complete request and response
+schemas, executable examples, validation cases, and failure contracts:
 
-### Create an account
+- Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 
-```http
-POST /api/v1/accounts
-Content-Type: application/json
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/accounts` | Create an account |
+| `GET` | `/api/v1/accounts/{accountId}/movements` | List a paginated, optionally filtered movement history |
+| `POST` | `/api/v1/transfer-tokens` | Issue a 10-minute transfer idempotency token |
+| `POST` | `/api/v1/transfers` | Create or idempotently replay an account-to-account transfer |
 
-{
-  "name": "John Doe",
-  "initialBalance": 1000.00
-}
-```
-
-Successful response: `201 Created`.
-
-```json
-{
-  "id": 1,
-  "name": "John Doe",
-  "balance": 1000.00,
-  "createdAt": "2026-08-31T18:45:00Z"
-}
-```
-
-The name is required, nonblank, and limited to 255 characters. The initial
-balance is required and must be non-negative.
-
-### List account movements
-
-```http
-GET /api/v1/accounts/1/movements?page=0&start=2026-08-01T00:00:00Z&end=2026-09-01T00:00:00Z&type=CREDIT
-```
-
-Successful response: `200 OK`.
-
-```json
-{
-  "content": [
-    {
-      "id": 42,
-      "operationId": "f6608b62-b6ba-4da2-864d-b8d49c48fb85",
-      "type": "CREDIT",
-      "amount": 100.00,
-      "createdAt": "2026-08-31T18:45:00Z"
-    }
-  ],
-  "page": 0,
-  "size": 10,
-  "totalElements": 1,
-  "totalPages": 1
-}
-```
-
-`page` defaults to zero. `start` is inclusive, `end` is exclusive, and
-`type` accepts only `CREDIT` or `DEBIT`. Results are ordered by occurrence time
-and movement ID descending. Invalid parameters return safe `400` Problem
-Details, an unknown account returns `404`, and an existing account without
-matches returns an empty `200` page.
-
-### Issue a transfer token
-
-Every transfer starts by obtaining a server-issued idempotency token:
-
-```http
-POST /api/v1/transfer-tokens
-```
-
-Successful response: `201 Created`.
-
-```json
-{
-  "token": "4e80db4d-ce8c-40a6-b839-b45fd45b1461",
-  "expiresAt": "2026-08-31T18:55:00Z"
-}
-```
-
-The token is valid for 10 minutes and must be sent in the
-`Idempotency-Key` header when creating a transfer.
-
-### Transfer funds
-
-```http
-POST /api/v1/transfers
-Content-Type: application/json
-Idempotency-Key: 4e80db4d-ce8c-40a6-b839-b45fd45b1461
-
-{
-  "sourceAccountId": 1,
-  "destinationAccountId": 2,
-  "amount": 100.00
-}
-```
-
-Successful response: `200 OK`.
-
-```json
-{
-  "transferId": "f6608b62-b6ba-4da2-864d-b8d49c48fb85",
-  "status": "COMPLETED",
-  "sourceAccountId": 1,
-  "destinationAccountId": 2,
-  "amount": 100.00
-}
-```
-
-The same token and normalized payload replay this response. Missing or malformed
-headers and invalid amounts return `400`; missing accounts return `404`;
-same-account transfers, insufficient funds, and invalid, expired, or
-payload-mismatched tokens return `409`; bounded lock or database failures return
-`503`. Expected failures use safe RFC 9457 Problem Details and do not expose
-SQL, credentials, balances, or rejected payloads.
+Swagger UI is the source for the principal successful, empty-result, transport
+validation, business conflict, not-found, and temporary-failure examples.
+Expected failures use safe RFC 9457 Problem Details.
 
 ### Transfer notifications
 
-Each newly completed transfer requests publication of this event shape:
-
-```json
-{
-  "eventId": "fd846da6-67e2-4b0a-868d-551a9ce19f39",
-  "operationId": "f6608b62-b6ba-4da2-864d-b8d49c48fb85",
-  "recipientAccountId": 1,
-  "eventType": "TRANSFER_COMPLETED",
-  "amount": 100.00,
-  "occurredAt": "2026-08-31T18:45:00Z"
-}
-```
+Each newly completed transfer requests publication of an event containing a
+unique event ID, the transfer operation ID, recipient account ID,
+`TRANSFER_COMPLETED` type, normalized amount, and occurrence time.
 
 RabbitMQ topology:
 
@@ -192,30 +146,6 @@ finite connection, handshake, channel RPC, attempt-count, and total-duration
 bounds. Exhausted attempts do not invalidate the committed transfer. The event
 may still be lost if the process stops after commit or duplicated by RabbitMQ
 or network behavior.
-
-## Architecture
-
-- Java 21 and Spring Boot 3.5.16.
-- Maven with the Maven Wrapper.
-- Spring Web MVC, Bean Validation, Spring Data JPA with Hibernate, MapStruct,
-  and Spring Security.
-- PostgreSQL 17.6 with immutable Flyway migrations. V1 creates accounts and
-  movements, V2 adds transfer idempotency state and the historical outbox, and
-  V3 removes the superseded outbox table.
-- RabbitMQ 4.1.4 for direct transfer-completed event publication.
-- Spring Boot Actuator and Micrometer for observability.
-- Docker and Docker Compose for reproducible local environments.
-- A layered monorepo with API, mapper, service, repository, entity, DTO, and
-  configuration boundaries.
-- `BigDecimal` and fixed-precision database types for monetary values.
-- A single `READ COMMITTED` transaction with pessimistic account locking for
-  each transfer.
-- At least 90% unit-test coverage for meaningful application logic, plus
-  isolated, integrated, concurrency, migration, and Gatling load tests.
-
-Decision records have mixed statuses. Accepted records govern idempotency,
-temporary unauthenticated API access, bounded contention failure, and direct
-best-effort notifications; the superseded outbox records remain as history.
 
 ## Documentation
 
@@ -238,8 +168,8 @@ Repository-wide contribution instructions are defined in [AGENTS.md](AGENTS.md).
 
 ### Prerequisites
 
-- Java 21 or later.
-- Docker with Docker Compose for local PostgreSQL and RabbitMQ.
+- Docker with Docker Compose for the complete local product.
+- Java 21 or later only for host-native development and test execution.
 
 The Maven Wrapper downloads the repository's configured Maven version, so a
 host Maven installation is not required.
@@ -278,69 +208,69 @@ With the dedicated load-test environment configured through the
 `TRANSFER_LOAD_*` variables in `.env.example`, run:
 
 ```bash
-./mvnw -B -ntp -Pload-tests gatling:test
+./mvnw -B -ntp -Pload-tests \
+  -Dtransfer.load.rate=10 \
+  -Dtransfer.load.duration-seconds=30 \
+  gatling:test
 ```
 
-### Run locally
+`transfer.load.rate` defines the number of transfer requests started per
+second. The planned transfer load is `rate × duration`; the example above runs
+approximately 300 transfer requests. Change either Maven parameter to adjust
+the load without editing the simulation code.
 
-Start PostgreSQL and RabbitMQ:
+## Run the complete product locally
+
+Build the application and start it with PostgreSQL, RabbitMQ, Prometheus, and
+Grafana. No host Java or Maven installation is needed:
 
 ```bash
-docker compose up -d --wait postgres rabbitmq
+docker compose up --build --wait
 ```
 
-Then start the application:
+After every service reports healthy, these local surfaces are ready:
 
-```bash
-./mvnw spring-boot:run
-```
-
-Local infrastructure ports and credentials can be overridden through the
-variables documented in `.env.example`. Docker Compose loads a copied `.env`
-file automatically; application variables must be exported or passed to the
-application process explicitly.
-
-Stop local infrastructure with:
-
-```bash
-docker compose down
-```
-
-### Configuration
-
-Application runtime settings:
-
-| Variable | Default | Purpose |
+| Surface | URL | Access |
 | --- | --- | --- |
-| `SERVER_PORT` | `8080` | HTTP server port |
-| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/simplified_banking` | JDBC connection URL |
-| `DATABASE_USERNAME` | `simplified_banking` | Application database user |
-| `DATABASE_PASSWORD` | `simplified_banking` | Application database password |
-| `RABBITMQ_HOST` | `localhost` | RabbitMQ host |
-| `RABBITMQ_PORT` | `5672` | RabbitMQ AMQP port |
-| `RABBITMQ_USERNAME` | `simplified_banking` | RabbitMQ user |
-| `RABBITMQ_PASSWORD` | `simplified_banking` | RabbitMQ password |
-| `TRANSFER_LOCK_TIMEOUT_MS` | `5000` | Positive transaction-local PostgreSQL lock timeout |
-| `TRANSFER_NOTIFICATION_MAX_ATTEMPTS` | `3` | Maximum RabbitMQ publication attempts after commit |
-| `TRANSFER_NOTIFICATION_MAX_DURATION` | `3s` | Total monotonic publication retry budget |
-| `TRANSFER_NOTIFICATION_CONNECTION_TIMEOUT` | `1s` | RabbitMQ TCP connection timeout |
-| `TRANSFER_NOTIFICATION_HANDSHAKE_TIMEOUT` | `1s` | RabbitMQ AMQP handshake timeout |
-| `TRANSFER_NOTIFICATION_CHANNEL_RPC_TIMEOUT` | `1s` | RabbitMQ channel RPC timeout |
+| Swagger UI | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) | Public local API documentation |
+| OpenAPI JSON | [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs) | Public local API contract |
+| Grafana dashboard | [http://localhost:3000/d/simplified-banking/simplified-banking-service](http://localhost:3000/d/simplified-banking/simplified-banking-service) | Anonymous read-only viewer |
+| Prometheus UI | [http://localhost:9090](http://localhost:9090) | Loopback-only metrics queries |
+| RabbitMQ management | [http://localhost:15672](http://localhost:15672) | Credentials from `.env.example` |
 
-Compose infrastructure additionally accepts `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_PORT`, and `RABBITMQ_MANAGEMENT_PORT`. Gatling
-uses the separate `TRANSFER_LOAD_*` variables documented in `.env.example` and
-in the load-test guide above.
+### Grafana dashboard
+
+The Grafana datasource and dashboard are provisioned automatically. Exercise
+the APIs through Swagger and refresh Grafana to see request, outcome, latency,
+database, lock, JVM, CPU, and connection-pool metrics. Click the preview to
+open the local interactive dashboard.
+
+[![Grafana dashboard preview](docs/assets/grafana-dashboard.png)](http://localhost:3000/d/simplified-banking/simplified-banking-service)
+
+### Generate dashboard demonstration data
+
+Copy the prompt below into an AI coding agent while the application is running:
+
+```text
+Using the APIs documented in Swagger at http://localhost:8080/swagger-ui.html,
+create 10 new accounts with an initial balance of 10000.00 and then create 50
+successful transfers distributed among those accounts. Generate a new
+idempotency token for every transfer, wait 2 seconds after every HTTP request,
+do not delete or change existing data, and finally report the created account
+IDs, transfer count, and total number of movements.
+```
 
 ### Observability and security
 
-Actuator exposes `health`, `info`, and `metrics`; operational routes remain
-protected by Spring Security. The temporary unauthenticated exception applies
-only to `/api/v1/**`.
+Actuator exposes `health`, `info`, `metrics`, and `prometheus`; operational
+routes remain protected by default. The complete Compose topology enables
+unauthenticated Prometheus scraping only on the application's internal,
+unpublished management port. The temporary public API exception applies to
+`/api/v1/**`, `/v3/api-docs/**`, and Swagger UI documentation routes.
 
 API operations use bounded `operation` tags (`account.create`,
-`transfer-token.issue`, and `transfer.create`) and publish these Micrometer
-meters:
+`movement.list`, `transfer-token.issue`, and `transfer.create`) and
+publish these Micrometer meters:
 
 - `banking.api.requests.total`
 - `banking.api.requests.successful`
@@ -374,8 +304,8 @@ The implemented delivery includes:
 - Flyway V1 accounts/movements, V2 transfer-idempotency history, and V3 outbox
   removal.
 - Account creation with validation and monetary normalization.
-- Read-only account movement history with fixed pagination and optional date
-  and movement-type filters.
+- Read-only account movement history with fixed pagination, `1d`/`1w`/`1M`
+  lookback periods, and optional movement-type filtering.
 - Server-issued transfer tokens and idempotent, atomic, pessimistically locked
   transfers.
 - Direct best-effort RabbitMQ transfer-completed events with bounded in-memory

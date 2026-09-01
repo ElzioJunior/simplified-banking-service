@@ -8,6 +8,9 @@ import org.springframework.dao.QueryTimeoutException;
 import org.springframework.dao.TransientDataAccessResourceException;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 class ApiMetricsTest {
 
@@ -72,7 +75,21 @@ class ApiMetricsTest {
         assertCount(registry, "banking.api.timeouts", ApiOperation.TRANSFER_TOKEN_ISSUE, 1);
     }
 
-    private void assertCount(SimpleMeterRegistry registry, String name, ApiOperation operation, double expected) {
+    /** Proves the existing bounded meters receive stable Prometheus names and labels for dashboard queries. */
+    @Test
+    void shouldPublishStablePrometheusSeries() {
+        PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        ApiMetrics metrics = new ApiMetrics(registry);
+
+        metrics.recordOutcome(ApiOperation.ACCOUNT_CREATE, 200, metrics.start());
+
+        assertThat(registry.scrape())
+                .contains("banking_api_requests_total{operation=\"account.create\"} 1.0")
+                .contains("banking_api_requests_successful_total{operation=\"account.create\"} 1.0")
+                .contains("banking_api_request_latency_seconds_count{operation=\"account.create\"} 1");
+    }
+
+    private void assertCount(MeterRegistry registry, String name, ApiOperation operation, double expected) {
         assertThat(registry.counter(name, "operation", operation.metricTag()).count()).isEqualTo(expected);
     }
 }

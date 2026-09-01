@@ -29,7 +29,7 @@ import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTo
 
 /** Executes one complete idempotent account-to-account financial operation. */
 @Service
-public class CreateTransferService {
+public class TransferService {
 
     private static final int MONETARY_SCALE = 2;
     private static final int MAX_INTEGER_DIGITS = 17;
@@ -42,7 +42,7 @@ public class CreateTransferService {
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
-    public CreateTransferService(
+    public TransferService(
             TransferIdempotencyTokenRepository tokenRepository,
             AccountRepository accountRepository,
             MovementRepository movementRepository,
@@ -66,7 +66,7 @@ public class CreateTransferService {
      * completion also schedules best-effort event publication after commit.
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public CompletedTransferDto create(CreateTransferDto transfer) {
+    public CompletedTransferDto createTransfer(CreateTransferDto transfer) {
         ValidatedTransfer requested = validate(transfer);
         lockTimeoutConfigurer.configureCurrentTransaction();
         OffsetDateTime now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)

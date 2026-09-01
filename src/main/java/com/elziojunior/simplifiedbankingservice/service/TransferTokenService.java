@@ -14,7 +14,7 @@ import com.elziojunior.simplifiedbankingservice.repository.TransferIdempotencyTo
 
 /** Issues the short-lived server token required before transfer submission. */
 @Service
-public class IssueTransferTokenService {
+public class TransferTokenService {
 
     private static final long TOKEN_VALIDITY_MINUTES = 10;
 
@@ -22,7 +22,7 @@ public class IssueTransferTokenService {
     private final UuidGenerator uuidGenerator;
     private final Clock clock;
 
-    public IssueTransferTokenService(
+    public TransferTokenService(
             TransferIdempotencyTokenRepository tokenRepository,
             UuidGenerator uuidGenerator,
             Clock clock) {
@@ -33,7 +33,7 @@ public class IssueTransferTokenService {
 
     /** Persists a unique token with the ADR-0026 lifetime so retries have durable identity. */
     @Transactional
-    public IssuedTransferTokenDto issue() {
+    public IssuedTransferTokenDto issueTransferToken() {
         OffsetDateTime createdAt = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
                 .truncatedTo(ChronoUnit.MICROS);
         TransferIdempotencyTokenEntity token = new TransferIdempotencyTokenEntity(

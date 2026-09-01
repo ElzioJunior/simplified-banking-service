@@ -18,7 +18,7 @@ import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 
 /** Creates accounts while enforcing the application-owned opening invariants. */
 @Service
-public class CreateAccountService {
+public class AccountService {
 
     private static final int MAX_NAME_LENGTH = 255;
     private static final int MONETARY_SCALE = 2;
@@ -27,7 +27,7 @@ public class CreateAccountService {
     private final AccountRepository accountRepository;
     private final Clock clock;
 
-    public CreateAccountService(AccountRepository accountRepository, Clock clock) {
+    public AccountService(AccountRepository accountRepository, Clock clock) {
         this.accountRepository = accountRepository;
         this.clock = clock;
     }
@@ -42,7 +42,7 @@ public class CreateAccountService {
      * @throws AccountCreationValidationException when an account invariant is violated
      */
     @Transactional
-    public CreatedAccountDto create(CreateAccountDto account) {
+    public CreatedAccountDto createAccount(CreateAccountDto account) {
         if (account == null) {
             throw new AccountCreationValidationException("Account creation data is required.");
         }

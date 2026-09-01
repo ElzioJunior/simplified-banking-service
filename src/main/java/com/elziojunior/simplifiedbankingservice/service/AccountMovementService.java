@@ -1,5 +1,7 @@
 package com.elziojunior.simplifiedbankingservice.service;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -12,14 +14,16 @@ import com.elziojunior.simplifiedbankingservice.exception.AccountMovementNotFoun
 import com.elziojunior.simplifiedbankingservice.exception.AccountMovementValidationException;
 import com.elziojunior.simplifiedbankingservice.model.dto.ListAccountMovementsDto;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementItemDto;
+import com.elziojunior.simplifiedbankingservice.model.dto.MovementLookbackPeriod;
 import com.elziojunior.simplifiedbankingservice.model.dto.MovementPageDto;
 import com.elziojunior.simplifiedbankingservice.model.entity.MovementEntity;
+import com.elziojunior.simplifiedbankingservice.model.mapper.AccountMovementMapper;
 import com.elziojunior.simplifiedbankingservice.repository.AccountRepository;
 import com.elziojunior.simplifiedbankingservice.repository.MovementRepository;
 
 /** Lists one account's immutable financial history through a bounded read-only query. */
 @Service
-public class ListAccountMovementsService {
+public class AccountMovementService {
 
     private static final int PAGE_SIZE = 10;
     private static final Sort NEWEST_FIRST = Sort.by(
@@ -28,34 +32,44 @@ public class ListAccountMovementsService {
 
     private final AccountRepository accountRepository;
     private final MovementRepository movementRepository;
+    private final AccountMovementMapper accountMovementMapper;
+    private final Clock clock;
 
-    public ListAccountMovementsService(AccountRepository accountRepository, MovementRepository movementRepository) {
+    public AccountMovementService(
+            AccountRepository accountRepository,
+            MovementRepository movementRepository,
+            AccountMovementMapper accountMovementMapper,
+            Clock clock) {
         this.accountRepository = accountRepository;
         this.movementRepository = movementRepository;
+        this.accountMovementMapper = accountMovementMapper;
+        this.clock = clock;
     }
 
     /**
-     * Validates the approved range, distinguishes a missing account from empty
-     * history, and returns one deterministic fixed-size page without loading
-     * the movement-to-account lazy relationship.
+     * Resolves the approved recent-history window, distinguishes a missing
+     * account from empty history, and returns one deterministic fixed-size page
+     * without loading the movement-to-account lazy relationship.
      *
      * @param query account, page, and optional movement filters
      * @return matching movement page
-     * @throws AccountMovementValidationException when page or range input is invalid
+     * @throws AccountMovementValidationException when page or period input is invalid
      * @throws AccountMovementNotFoundException when the account does not exist
      */
     @Transactional(readOnly = true)
-    public MovementPageDto list(ListAccountMovementsDto query) {
+    public MovementPageDto listAccountMovements(ListAccountMovementsDto query) {
         validate(query);
         if (!accountRepository.existsById(query.accountId())) {
             throw new AccountMovementNotFoundException("The requested account does not exist.");
         }
 
+        OffsetDateTime end = OffsetDateTime.now(clock);
+        OffsetDateTime start = resolveStart(query.period(), end);
         PageRequest pageRequest = PageRequest.of(query.page(), PAGE_SIZE, NEWEST_FIRST);
         Page<MovementEntity> movements = movementRepository.findPageByAccountAndFilters(
-                query.accountId(), query.start(), query.end(), query.type(), pageRequest);
+                query.accountId(), start, end, query.type(), pageRequest);
         List<MovementItemDto> content = movements.getContent().stream()
-                .map(this::toDto)
+                .map(accountMovementMapper::toDto)
                 .toList();
         return new MovementPageDto(
                 content,
@@ -73,18 +87,21 @@ public class ListAccountMovementsService {
         if (query.page() < 0) {
             throw new AccountMovementValidationException("Page must be greater than or equal to zero.");
         }
-        if (query.start() != null && query.end() != null && !query.start().isBefore(query.end())) {
-            throw new AccountMovementValidationException("Start must be before end.");
+        if (query.period() == null) {
+            throw new AccountMovementValidationException("Movement period is required.");
         }
     }
 
-    /** Copies approved movement fields into an application result without traversing the account relationship. */
-    private MovementItemDto toDto(MovementEntity movement) {
-        return new MovementItemDto(
-                movement.getId(),
-                movement.getOperationId(),
-                movement.getType(),
-                movement.getAmount(),
-                movement.getCreatedAt());
+    /**
+     * Calculates the inclusive lower bound from the single request instant so
+     * day, week, and calendar-month windows remain deterministic and testable.
+     */
+    private OffsetDateTime resolveStart(MovementLookbackPeriod period, OffsetDateTime end) {
+        return switch (period) {
+            case ONE_DAY -> end.minusDays(1);
+            case ONE_WEEK -> end.minusWeeks(1);
+            case ONE_MONTH -> end.minusMonths(1);
+        };
     }
+
 }
