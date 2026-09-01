@@ -219,7 +219,7 @@ second. The planned transfer load is `rate × duration`; the example above runs
 approximately 300 transfer requests. Change either Maven parameter to adjust
 the load without editing the simulation code.
 
-### Run the complete product locally
+## Run the complete product locally
 
 Build the application and start it with PostgreSQL, RabbitMQ, Prometheus, and
 Grafana. No host Java or Maven installation is needed:
@@ -259,61 +259,6 @@ idempotency token for every transfer, wait 2 seconds after every HTTP request,
 do not delete or change existing data, and finally report the created account
 IDs, transfer count, and total number of movements.
 ```
-
-Stop the complete topology without deleting its named volumes:
-
-```bash
-docker compose down
-```
-
-To override local ports, retention, or development credentials, copy
-`.env.example` to `.env` before startup and edit only the desired values.
-Docker Compose loads `.env` automatically.
-
-### Optional host-native application startup
-
-For a faster application edit/restart cycle, start only its dependencies:
-
-```bash
-docker compose up -d --wait postgres rabbitmq
-./mvnw spring-boot:run
-```
-
-Local infrastructure ports and credentials can be overridden through the
-variables documented in `.env.example`. Docker Compose loads a copied `.env`
-file automatically; application variables must be exported or passed to the
-application process explicitly.
-
-### Configuration
-
-Application runtime settings:
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `SERVER_PORT` | `8080` | HTTP server port |
-| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/simplified_banking` | JDBC connection URL |
-| `DATABASE_USERNAME` | `simplified_banking` | Application database user |
-| `DATABASE_PASSWORD` | `simplified_banking` | Application database password |
-| `RABBITMQ_HOST` | `localhost` | RabbitMQ host |
-| `RABBITMQ_PORT` | `5672` | RabbitMQ AMQP port |
-| `RABBITMQ_USERNAME` | `simplified_banking` | RabbitMQ user |
-| `RABBITMQ_PASSWORD` | `simplified_banking` | RabbitMQ password |
-| `TRANSFER_LOCK_TIMEOUT_MS` | `5000` | Positive transaction-local PostgreSQL lock timeout |
-| `TRANSFER_NOTIFICATION_MAX_ATTEMPTS` | `3` | Maximum RabbitMQ publication attempts after commit |
-| `TRANSFER_NOTIFICATION_MAX_DURATION` | `3s` | Total monotonic publication retry budget |
-| `TRANSFER_NOTIFICATION_CONNECTION_TIMEOUT` | `1s` | RabbitMQ TCP connection timeout |
-| `TRANSFER_NOTIFICATION_HANDSHAKE_TIMEOUT` | `1s` | RabbitMQ AMQP handshake timeout |
-| `TRANSFER_NOTIFICATION_CHANNEL_RPC_TIMEOUT` | `1s` | RabbitMQ channel RPC timeout |
-| `PROMETHEUS_HOST` | `127.0.0.1` | Host interface for the local Prometheus UI |
-| `PROMETHEUS_PORT` | `9090` | Host port for the local Prometheus UI |
-| `PROMETHEUS_RETENTION` | `7d` | Local Prometheus time-series retention |
-| `GRAFANA_HOST` | `127.0.0.1` | Host interface for the local Grafana UI |
-| `GRAFANA_PORT` | `3000` | Host port for the local Grafana UI |
-
-Compose infrastructure additionally accepts `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_PORT`, and `RABBITMQ_MANAGEMENT_PORT`. Gatling
-uses the separate `TRANSFER_LOAD_*` variables documented in `.env.example` and
-in the load-test guide above.
 
 ### Observability and security
 
